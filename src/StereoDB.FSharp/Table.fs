@@ -6,6 +6,7 @@ open StereoDB
 
 type IReadOnlyTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ITable<'TId, 'TEntity>
+    abstract GetIds: unit -> 'TId seq
     abstract Get: id:'TId -> 'TEntity voption    
     
 type IReadWriteTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
@@ -20,6 +21,9 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
     
     interface IReadOnlyTable<'TId, 'TEntity> with
                     
+        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]            
+        member this.GetIds() = _data.Keys |> Seq.map id
+        
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]                    
         member this.Get(id) =
             match _data.TryGetValue id with
@@ -41,7 +45,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                                 | true, v -> v
                                 | _       -> ()
                         }
-            }     
+            }
             
     interface IReadWriteTable<'TId, 'TEntity> with
         
