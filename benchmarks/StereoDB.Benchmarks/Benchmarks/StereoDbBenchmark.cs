@@ -10,7 +10,7 @@ class UsersSchema
 
     public UsersSchema()
     {
-        var table = StereoDbEngine<UsersSchema>.CreateTable<Guid, User>();
+        var table = StereoDbEngine.CreateTable<Guid, User>();
         var emailIndex = table.AddValueIndex(x => x.Email);
 
         Table = table;
@@ -25,7 +25,7 @@ class Schema
 
 class Db : IStereoDb<Schema>
 {
-    private readonly StereoDbEngine<Schema> _engine = new StereoDbEngine<Schema>(new Schema());
+    private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
 
     public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => _engine.ReadTransaction(transaction);
     public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => _engine.WriteTransaction(transaction);

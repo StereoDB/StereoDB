@@ -53,3 +53,9 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
     static member CreateTable() =
         StereoDbTable<'TId, 'TEntity>()
         :> ITable<'TId, 'TEntity>
+        
+type StereoDbEngine =    
+    static member Create(schema: 'TSchema) = StereoDbEngine(schema)    
+    static member CreateTable() =
+        StereoDbTable<'TId, 'TEntity>()
+        :> ITable<'TId, 'TEntity>
