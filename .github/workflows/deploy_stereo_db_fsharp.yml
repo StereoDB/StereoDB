@@ -1,0 +1,23 @@
+name: deploy
+
+on:
+  push:
+    branches: [ "fsharp" ]
+
+jobs:
+  deploy:
+    environment: PROD
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: 7.x.x
+    - name: Restore dependencies
+      run: dotnet restore StereoDB.sln
+    - name: Pack
+      run: dotnet pack src/StereoDB.FSharp/StereoDB.FSharp.fsproj -c Release -o artifacts --include-source
+    - name: Publish
+      run: dotnet nuget push artifacts/**.nupkg -s https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_TOKEN }}

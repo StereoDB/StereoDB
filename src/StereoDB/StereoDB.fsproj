@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Title>StereoDB</Title>
+        <Description>Ultrafast and lightweight in-process memory database that supports: transactions, secondary indexes, persistence, and data size larger than memory.</Description>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <Authors>Anton Moldovan</Authors>
+        <Company>StereoDB</Company>
+        <Version>0.1.0-beta.0</Version>
+        <Copyright>StereoDB@2023</Copyright>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+        <PackageIcon>stereo_db_icon.jpg</PackageIcon>
+        <RepositoryUrl>https://github.com/StereoDB/StereoDB</RepositoryUrl>
+        <PackageTags>memory-db, cache, key value store</PackageTags>
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <OtherFlags>$(OtherFlags) --test:GraphBasedChecking --test:ParallelOptimization --test:ParallelIlxGen</OtherFlags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="CoreTypes.fs" />
+        <Compile Include="SecondaryIndex\ValueIndex.fs" />
+        <Compile Include="CSharp\Table.fs" />
+        <Compile Include="CSharp\StereoDb.fs" />        
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="../../LICENSE" Pack="true" Visible="false" PackagePath="" />
+        <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />
+    </ItemGroup>
+
+</Project>
