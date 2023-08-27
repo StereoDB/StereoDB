@@ -7,6 +7,7 @@ open StereoDB
 
 type IReadOnlyTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ITable<'TId, 'TEntity>
+    abstract GetIds: unit -> 'TId seq 
     abstract TryGet: id:'TId * [<Out>]entity:'TEntity byref -> bool    
     
 type IReadWriteTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
@@ -20,6 +21,9 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
     let _indexes = ResizeArray<ISecondaryIndex<'TId, 'TEntity>>()
     
     interface IReadOnlyTable<'TId, 'TEntity> with
+        
+        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]            
+        member this.GetIds() = _data.Keys |> Seq.map id
                     
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]                    
         member this.TryGet(id, item) =

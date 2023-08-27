@@ -98,3 +98,29 @@ let ``Get and Set operations should work correctly`` () =
     test <@ book.Quantity = 0 @>
     test <@ orders[0].Quantity = 1 @>
     test <@ orders[0].BookId = book.Id @>
+    
+[<Test>]
+let ``GetIds should be supported`` () =
+    let db = Db.Create()
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        
+        for i in [1..10] do
+            let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
+            books.Set book
+    )
+    
+    let result = db.ReadTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        
+        let ids = books.GetIds()        
+        
+        if Seq.isEmpty ids then ValueNone
+        else ValueSome(ids |> Seq.toArray)
+    )
+    
+    let ids = result.Value
+    
+    test <@ ids.Length = 10 @>
