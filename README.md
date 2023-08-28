@@ -167,9 +167,7 @@ F# API has some benefits over C# API, mainly in expressiveness and type safety:
 
 - [Anonymous Records](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/anonymous-records) - It provides in place schema definition. You don't need to define extra types for schema as you do with C#. Also, it helps you model efficient **(zero-cost, since it supports [structs](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/structs))** and expressive - return result type. 
 - [ValueOption<'T>](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/value-options) - It's used for StereoDB API to model emptiness in a type safe manner. Also, it's a **zero-cost abstraction** since it's struct.
-- [Computation Expression](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) - It helps to express multiple if & else checks on emptiness/null for ValueOption<'T>, into a single **voption { }** expression. To use **voption { }**, [FsToolkit.ErrorHandling](https://github.com/demystifyfp/FsToolkit.ErrorHandling) should be installed.  
-
-With these constructions, you get **zero cost** abstractions that help reduce allocations and keep code expressive and readable.
+- [Computation Expression](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/computation-expressions) - It helps to express multiple if & else checks on emptiness/null for ValueOption<'T>, into a single **voption { }** expression. To use **voption { }**, [FsToolkit.ErrorHandling](https://github.com/demystifyfp/FsToolkit.ErrorHandling) should be installed. In the case of **voption {}**, it's also a **zero-cost abstraction**, the compiler generates optimized code without allocations.
 
 ```fsharp
 open System
