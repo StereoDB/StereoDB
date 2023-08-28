@@ -43,10 +43,6 @@ type Db() =
         member this.WriteTransaction<'T>(transaction) = _engine.WriteTransaction<'T>(transaction)
         
     static member Create() = Db() :> IStereoDb<Schema>
-             
-// [<SetUp>]
-// let Setup () =    
-//     ()
 
 [<Test>]
 let ``Get and Set operations should work correctly`` () =
@@ -66,7 +62,7 @@ let ``Get and Set operations should work correctly`` () =
         let books = ctx.UseTable(ctx.Schema.Books.Table)
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
         
-        for id in [1..10] do
+        for id in books.GetIds() do
             voption {
                 let! book = books.Get id
                 if book.Quantity > 0 then
