@@ -46,8 +46,7 @@ public record Schema
 
         var ordersTable = StereoDbEngine.CreateTable<Guid, Order>();
 
-
-        Orders = new OrdersSchema()
+        Orders = new OrdersSchema
         {
             Table = ordersTable,
             BookIdIndex = ordersTable.AddValueIndex(order => order.BookId)

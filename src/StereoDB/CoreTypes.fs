@@ -9,8 +9,9 @@ type ISecondaryIndex = interface end
 
 type internal ISecondaryIndex<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ISecondaryIndex
-    abstract ReIndex: entity:'TEntity -> unit
-    abstract RemoveFromIndex: id:'TId -> unit
+    abstract AddToIndex: entity:'TEntity -> unit
+    abstract TryReIndex: oldEntity:'TEntity * newEntity:'TEntity -> unit
+    abstract RemoveFromIndex: entity:'TEntity -> unit
 
 type IValueIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IComparable<'TValue>> =
     inherit ISecondaryIndex

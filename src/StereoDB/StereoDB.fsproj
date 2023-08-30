@@ -26,11 +26,15 @@
         <Compile Include="SecondaryIndex\ValueIndex.fs" />
         <Compile Include="CSharp\Table.fs" />
         <Compile Include="CSharp\StereoDb.fs" />        
-    </ItemGroup>
-
+    </ItemGroup>    
+    
     <ItemGroup>
         <None Include="../../LICENSE" Pack="true" Visible="false" PackagePath="" />
         <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Update="FSharp.Core" Version="7.0.300" />
     </ItemGroup>
 
 </Project>

@@ -51,14 +51,24 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
         member this.Set(entity) =
-            _data[entity.Id] <- entity
-            
-            for index in _indexes do
-                index.ReIndex entity
+            match _data.TryGetValue entity.Id with
+            | true, oldEntity ->
+                for index in _indexes do
+                    index.TryReIndex(oldEntity, entity)
+                
+            | _ ->
+                for index in _indexes do
+                    index.AddToIndex(entity)
+                    
+            _data[entity.Id] <- entity                    
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
         member this.Delete(id) =
-            for index in _indexes do
-                index.RemoveFromIndex id
-                
+            match _data.TryGetValue id with
+            | true, entity ->                
+                for index in _indexes do
+                    index.RemoveFromIndex(entity)                
+            
+            | _ -> ()
+            
             _data.Remove id

@@ -7,11 +7,10 @@ type internal IInternalValueIndex<'TId, 'TValue> =
     inherit ISecondaryIndex
     abstract Find: value:'TValue -> 'TId seq
     
-type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality and 'TValue :> IComparable<'TValue>> 
+type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
     (getValue: 'TEntity -> 'TValue) =
     
-    let _valueIds = Dictionary<'TValue, HashSet<'TId>>()
-    let _idValues = Dictionary<'TId, 'TValue>()
+    let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
     let addNewValue (id: 'TId) (newValue: 'TValue) =
         match _valueIds.TryGetValue newValue with
@@ -29,28 +28,21 @@ type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEnti
         | _         -> ()
     
     interface ISecondaryIndex<'TId, 'TEntity> with
-        member this.ReIndex(entity) =
-            let id = entity.Id
+        member this.AddToIndex(entity) =
             let value = getValue entity
-
-            match _idValues.TryGetValue id with // check if ID already in index
-            | true, oldValue ->
-                if oldValue.CompareTo value <> 0 then // check if values are different and we should reindex
-                    removeOldValue id oldValue
-                    addNewValue id value
-                    _idValues[id] <- value                
-            
-            | _ ->                             // indexing ID and Value                
-                addNewValue id value
-                _idValues[id] <- value            
+            addNewValue entity.Id value            
         
-        member this.RemoveFromIndex(id) =
-            match _idValues.TryGetValue id with
-            | true, value ->
-                removeOldValue id value
-                _idValues.Remove(id) |> ignore
+        member this.TryReIndex(oldEntity, newEntity) =
+            let oldValue = getValue oldEntity
+            let newValue = getValue newEntity
             
-            | _ -> ()
+            if oldValue <> newValue then  // check if values are different and we should reindex
+                removeOldValue oldEntity.Id oldValue
+                addNewValue oldEntity.Id newValue           
+        
+        member this.RemoveFromIndex(entity) =
+            let value = getValue entity
+            removeOldValue entity.Id value
         
     interface IInternalValueIndex<'TId, 'TValue> with        
         member this.Find(value) =
