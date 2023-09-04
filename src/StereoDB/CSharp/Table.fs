@@ -66,6 +66,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                                 | true, v -> v
                                 | _       -> ()
                         }
+                        
                     member this.SelectRange(fromValue, toValue) =
                         let ids = index.SelectRangeIds(fromValue, toValue)
                         seq {
