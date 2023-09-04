@@ -28,7 +28,7 @@ public record OrdersSchema
 {
     public ITable<Guid, Order> Table { get; init; }
     public IValueIndex<int, Order> BookIdIndex { get; init; }
-    public IRangeScanIndex<int, Order> QuantityIndex { get; init; }
+    public IRangeScanIndex<int, Order> QuantityRangeIndex { get; init; }
 }
 
 // defines a DB schema that includes Orders and Books tables
@@ -51,7 +51,7 @@ public record Schema
         {
             Table = ordersTable,
             BookIdIndex = ordersTable.AddValueIndex(order => order.BookId),
-            QuantityIndex = ordersTable.AddRangeScanIndex(order => order.Quantity)
+            QuantityRangeIndex = ordersTable.AddRangeScanIndex(order => order.Quantity)
         };
     }
 }

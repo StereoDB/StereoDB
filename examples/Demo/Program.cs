@@ -44,7 +44,7 @@ var result = db.ReadTransaction(ctx =>
 {
     var books = ctx.UseTable(ctx.Schema.Books.Table);
     var bookIdIndex = ctx.Schema.Orders.BookIdIndex;
-    var quantityIndex = ctx.Schema.Orders.QuantityIndex;
+    var quantityIndex = ctx.Schema.Orders.QuantityRangeIndex;
     
     // example of RangeScanIndex
     var booksRange = quantityIndex.SelectRange(0, 5).ToArray();
