@@ -95,3 +95,34 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         test <@ data[1].Quantity = 5 @>
         test <@ data[2].Quantity = 10 @>
     )
+    
+[<Fact>]
+let ``RangeScanIndex should support reindex`` () =
+    
+    let db = Db.Create()
+    
+    db.WriteTransaction(fun ctx ->
+        let orders = ctx.UseTable(ctx.Schema.Orders.Table)
+                
+        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
+        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 5 }
+        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 3 }
+      
+        orders.Set order1
+        orders.Set order2
+        orders.Set order3
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
+        test <@ data.Length = 2 @>
+        
+        // change quantity and update item
+        let updatedOrder2 = { order2 with Quantity = 100 }
+        orders.Set updatedOrder2
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
+        test <@ data.Length = 1 @>
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 100) |> Seq.toArray
+        test <@ data.Length = 2 @>
+        test <@ data[1].Quantity = 100 @>            
+    )
