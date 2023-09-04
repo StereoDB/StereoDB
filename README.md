@@ -3,7 +3,7 @@
 </p>
 
 [![build](https://github.com/StereoDB/StereoDB/actions/workflows/build.yml/badge.svg)](https://github.com/StereoDB/StereoDB/actions/workflows/build.yml)
-[![NuGet](https://img.shields.io/nuget/v/stereodb.svg)](https://www.nuget.org/packages/nbomber/)
+[![NuGet](https://img.shields.io/nuget/v/stereodb.svg)](https://www.nuget.org/packages/stereodb/)
 
 #### StereoDB
 Ultrafast and lightweight in-process memory database written in F# that supports: transactions, secondary indexes, persistence, and data size larger than RAM. The primary use case for this database is building Stateful Services (API or ETL Worker) that keep all data in memory and can provide millions of RPS from a single node. 
