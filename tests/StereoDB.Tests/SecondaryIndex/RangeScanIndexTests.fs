@@ -83,5 +83,15 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         
         test <@ data.Length = 2 @>
         test <@ data[0].Quantity = 3 @>
-        test <@ data[1].Quantity = 5 @>        
+        test <@ data[1].Quantity = 5 @>
+        
+        // add new item
+        let order4 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 10 } 
+        orders.Set order4
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 11) |> Seq.toArray
+        
+        test <@ data.Length = 3 @>
+        test <@ data[0].Quantity = 3 @>
+        test <@ data[1].Quantity = 5 @>
+        test <@ data[2].Quantity = 10 @>
     )
