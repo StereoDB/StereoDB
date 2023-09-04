@@ -4,6 +4,8 @@ open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
 open StereoDB
+open StereoDB.SecondaryIndex.RangeScanIndex
+open StereoDB.SecondaryIndex.ValueIndex
 
 type IReadOnlyTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ITable<'TId, 'TEntity>
@@ -34,15 +36,38 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                 
             | _  -> false
 
-        member this.AddValueIndex(getValue) =
-            
+        member this.AddValueIndex(getValue) =            
             let index = ValueIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)            
             _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
             
             {
                 new IValueIndex<'TValue, 'TEntity> with
                     member this.Find(value) =
-                        let ids = (index :> IInternalValueIndex<'TId, 'TValue>).Find(value)
+                        let ids = index.FindIds(value)
+                        seq {
+                            for id in ids do
+                                match _data.TryGetValue id with
+                                | true, v -> v
+                                | _       -> ()
+                        }
+            }
+
+        member this.AddRangeScanIndex(getValue) =
+            let index = RangeScanIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)
+            _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+            
+            {
+                new IRangeScanIndex<'TValue, 'TEntity> with
+                    member this.Find(value) =
+                        let ids = index.FindIds(value)
+                        seq {
+                            for id in ids do
+                                match _data.TryGetValue id with
+                                | true, v -> v
+                                | _       -> ()
+                        }
+                    member this.SelectRange(fromValue, toValue) =
+                        let ids = index.SelectRangeIds(fromValue, toValue)
                         seq {
                             for id in ids do
                                 match _data.TryGetValue id with

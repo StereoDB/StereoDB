@@ -23,7 +23,7 @@ db.WriteTransaction(ctx =>
 {
     var books = ctx.UseTable(ctx.Schema.Books.Table);
     var orders = ctx.UseTable(ctx.Schema.Orders.Table);
-
+    
     foreach (var id in books.GetIds())
     {
         if (books.TryGet(id, out var book) && book.Quantity > 0)
@@ -44,7 +44,12 @@ var result = db.ReadTransaction(ctx =>
 {
     var books = ctx.UseTable(ctx.Schema.Books.Table);
     var bookIdIndex = ctx.Schema.Orders.BookIdIndex;
-
+    var quantityIndex = ctx.Schema.Orders.QuantityIndex;
+    
+    // example of RangeScanIndex
+    var booksRange = quantityIndex.SelectRange(0, 5).ToArray();
+    
+    // example of ValueIndex
     if (books.TryGet(1, out var book))
     {
         var orders = bookIdIndex.Find(book.Id).ToArray();

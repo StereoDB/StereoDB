@@ -1,13 +1,11 @@
-﻿namespace StereoDB
+﻿module internal StereoDB.SecondaryIndex.ValueIndex
 
 open System
 open System.Collections.Generic
+open System.Runtime.CompilerServices
+open StereoDB
     
-type internal IInternalValueIndex<'TId, 'TValue> =
-    inherit ISecondaryIndex
-    abstract Find: value:'TValue -> 'TId seq
-    
-type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
+type ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
     (getValue: 'TEntity -> 'TValue) =
     
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
@@ -27,25 +25,38 @@ type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEnti
         | true, ids -> ids.Remove(id) |> ignore
         | _         -> ()
     
+    member this.AddToIndex(entity) =
+        let value = getValue entity
+        addNewValue entity.Id value
+        
+    member inline this.AddToIndex(entityId, value) = addNewValue entityId value
+    
+    member this.TryReIndex(oldEntity, newEntity) =
+        let oldValue = getValue oldEntity
+        let newValue = getValue newEntity
+        
+        if oldValue <> newValue then  // check if values are different and we should reindex
+            removeOldValue oldEntity.Id oldValue
+            addNewValue oldEntity.Id newValue
+    
+    member this.RemoveFromIndex(entity) =
+        let value = getValue entity
+        removeOldValue entity.Id value
+        
+    member inline this.RemoveFromIndex(entityId, value) = removeOldValue entityId value
+    
+    member this.FindIds(value): 'TId seq  =
+        match _valueIds.TryGetValue value with
+        | true, ids -> ids
+        | _         -> Array.Empty<'TId>()
+    
     interface ISecondaryIndex<'TId, 'TEntity> with
-        member this.AddToIndex(entity) =
-            let value = getValue entity
-            addNewValue entity.Id value            
+    
+        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+        member this.AddToIndex(entity) = this.AddToIndex(entity)
         
-        member this.TryReIndex(oldEntity, newEntity) =
-            let oldValue = getValue oldEntity
-            let newValue = getValue newEntity
-            
-            if oldValue <> newValue then  // check if values are different and we should reindex
-                removeOldValue oldEntity.Id oldValue
-                addNewValue oldEntity.Id newValue           
+        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+        member this.TryReIndex(oldEntity, newEntity) = this.TryReIndex(oldEntity, newEntity)
         
-        member this.RemoveFromIndex(entity) =
-            let value = getValue entity
-            removeOldValue entity.Id value
-        
-    interface IInternalValueIndex<'TId, 'TValue> with        
-        member this.Find(value) =
-            match _valueIds.TryGetValue value with
-            | true, ids -> ids
-            | _         -> Array.Empty<'TId>()
+        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+        member this.RemoveFromIndex(entity) = this.RemoveFromIndex(entity)

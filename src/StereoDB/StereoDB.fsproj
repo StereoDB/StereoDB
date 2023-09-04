@@ -22,15 +22,17 @@
 
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="Infra\SkipList.fs" />
         <Compile Include="CoreTypes.fs" />
         <Compile Include="SecondaryIndex\ValueIndex.fs" />
+        <Compile Include="SecondaryIndex\RangeScanIndex.fs" />
         <Compile Include="CSharp\Table.fs" />
         <Compile Include="CSharp\StereoDb.fs" />        
     </ItemGroup>    
     
     <ItemGroup>
         <None Include="../../LICENSE" Pack="true" Visible="false" PackagePath="" />
-        <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />
+        <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />        
     </ItemGroup>
 
     <ItemGroup>

@@ -8,13 +8,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="TestHelper.fs" />
+        <Compile Include="TestHelper.fs" />        
+        <Compile Include="SecondaryIndex\RangeScanIndexTests.fs" />
+        <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
-        <Compile Include="ValueIndexTests.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="Maybe.NET" Version="1.0.123" />
         <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.9.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.7.0" />
         <PackageReference Include="Serilog.Sinks.InMemory" Version="0.11.0" />

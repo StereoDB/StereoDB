@@ -1,8 +1,9 @@
 ﻿namespace StereoDB.FSharp
 
 open System.Collections.Generic
-open System.Runtime.CompilerServices
 open StereoDB
+open StereoDB.SecondaryIndex.ValueIndex
+open StereoDB.SecondaryIndex.RangeScanIndex
 
 type IReadOnlyTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ITable<'TId, 'TEntity>
@@ -20,25 +21,46 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
     let _indexes = ResizeArray<ISecondaryIndex<'TId, 'TEntity>>()
     
     interface IReadOnlyTable<'TId, 'TEntity> with
-                    
-        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]            
+    
         member this.GetIds() = _data.Keys |> Seq.map id
-        
-        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]                    
+                                    
         member this.Get(id) =
             match _data.TryGetValue id with
             | true, v -> ValueSome v
             | _       -> ValueNone
 
-        member this.AddValueIndex(getValue) =
-            
+        member this.AddValueIndex(getValue) =            
             let index = ValueIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)            
             _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
             
             {
                 new IValueIndex<'TValue, 'TEntity> with
                     member this.Find(value) =
-                        let ids = (index :> IInternalValueIndex<'TId, 'TValue>).Find(value)
+                        let ids = index.FindIds(value)
+                        seq {
+                            for id in ids do
+                                match _data.TryGetValue id with
+                                | true, v -> v
+                                | _       -> ()
+                        }
+            }
+
+        member this.AddRangeScanIndex(getValue) =
+            let index = RangeScanIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)
+            _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+            
+            {
+                new IRangeScanIndex<'TValue, 'TEntity> with
+                    member this.Find(value) =
+                        let ids = index.FindIds(value)
+                        seq {
+                            for id in ids do
+                                match _data.TryGetValue id with
+                                | true, v -> v
+                                | _       -> ()
+                        }
+                    member this.SelectRange(fromValue, toValue) =
+                        let ids = index.SelectRangeIds(fromValue, toValue)
                         seq {
                             for id in ids do
                                 match _data.TryGetValue id with
@@ -48,8 +70,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
             }
             
     interface IReadWriteTable<'TId, 'TEntity> with
-        
-        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+                
         member this.Set(entity) =
             match _data.TryGetValue entity.Id with
             | true, oldEntity ->
@@ -61,8 +82,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                     index.AddToIndex(entity)
                     
             _data[entity.Id] <- entity                    
-        
-        [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+                
         member this.Delete(id) =
             match _data.TryGetValue id with
             | true, entity ->                

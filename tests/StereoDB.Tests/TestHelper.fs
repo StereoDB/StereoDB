@@ -7,11 +7,11 @@ open StereoDB.FSharp
 type Book = {
     Id: int
     Title: string
-    Quantity: int    
+    Quantity: int
 }
 with
     interface IEntity<int> with
-        member this.Id = this.Id
+        member this.Id = this.Id        
         
 type Order = {
     Id: Guid
@@ -26,7 +26,11 @@ type Schema() =
     let _books = {| Table = StereoDbEngine.CreateTable<int, Book>() |}
     
     let _ordersTable = StereoDbEngine.CreateTable<Guid, Order>()
-    let _orders = {| Table = _ordersTable; BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId) |}
+    let _orders = {|
+        Table = _ordersTable
+        BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
+        QuantityIndex = _ordersTable.AddRangeScanIndex(fun order -> order.Quantity)
+    |}
     
     member this.Books = _books
     member this.Orders = _orders
