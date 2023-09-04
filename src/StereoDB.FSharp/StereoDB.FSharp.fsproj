@@ -35,7 +35,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\StereoDB\StereoDB.fsproj" />
+        <PackageReference Update="FSharp.Core" Version="7.0.300" />
     </ItemGroup>
 
 </Project>
