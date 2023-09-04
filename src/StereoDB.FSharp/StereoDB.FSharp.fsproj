@@ -6,7 +6,7 @@
         <TargetFramework>netstandard2.1</TargetFramework>
         <Authors>Anton Moldovan</Authors>
         <Company>StereoDB</Company>
-        <Version>0.1.0-beta.1</Version>
+        <Version>0.1.0-beta.2</Version>
         <Copyright>StereoDB@2023</Copyright>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -29,13 +29,10 @@
         <None Include="../../LICENSE" Pack="true" Visible="false" PackagePath="" />
         <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />
     </ItemGroup>
-    
-    <ItemGroup>
-      <ProjectReference Include="..\StereoDB\StereoDB.fsproj" />
-    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Update="FSharp.Core" Version="7.0.300" />
+        <PackageReference Include="StereoDB" Version="0.1.0-beta.2" />
     </ItemGroup>
 
 </Project>
