@@ -1,6 +1,5 @@
 ﻿namespace StereoDB.FSharp
 
-open System.Runtime.CompilerServices
 open System.Threading
 open StereoDB
 
@@ -23,25 +22,22 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
     
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
     let _rCtx = ReadOnlyTsContext(schema)
-    let _rwCtx = ReadWriteTsContext(schema)
-        
-    [<MethodImpl(MethodImplOptions.AggressiveInlining)>]        
+    let _rwCtx = ReadWriteTsContext(schema)       
+            
     member this.ReadTransaction(transaction: ReadOnlyTsContext<'TSchema> -> 'T voption) =
         try
             _lockSlim.EnterReadLock()
             transaction _rCtx            
         finally
             _lockSlim.ExitReadLock()            
-    
-    [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
+        
     member this.WriteTransaction(transaction: ReadWriteTsContext<'TSchema> -> 'T voption) =
         try
             _lockSlim.EnterWriteLock()
             transaction _rwCtx            
         finally
             _lockSlim.ExitWriteLock()
-           
-    [<MethodImpl(MethodImplOptions.AggressiveInlining)>]                
+                    
     member this.WriteTransaction(transaction: ReadWriteTsContext<'TSchema> -> unit) =
         try
             _lockSlim.EnterWriteLock()

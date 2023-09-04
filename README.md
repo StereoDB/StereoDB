@@ -13,7 +13,7 @@ Supported features:
 - [x] Transactions (read-only, read-write)
 - [x] Secondary Indexes
   - [x] Value Index (hash-based index)
-  - [ ] Range Scan Index
+  - [x] Range Scan Index
 - [ ] Data size larger than RAM
 - [ ] Data persistence
 - [ ] Distributed mode

@@ -17,5 +17,10 @@ type IValueIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> ICompa
     inherit ISecondaryIndex
     abstract Find: value:'TValue -> 'TEntity seq
     
+type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IComparable<'TValue>> =
+    inherit IValueIndex<'TValue, 'TEntity>
+    abstract SelectRange: fromValue:'TValue * toValue: 'TValue -> 'TEntity seq
+    
 type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
-    abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>  
+    abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>
+    abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
