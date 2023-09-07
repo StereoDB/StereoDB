@@ -21,7 +21,21 @@ Supported features:
   - [ ] Range-based sharding
 
 #### Benchmarks
-TBD
+
+Pure in-process only (without persistance) benchmark for StereoDB. In [this benchmark](https://github.com/StereoDB/StereoDB/blob/dev/benchmarks/StereoDB.Benchmarks/Benchmarks/StereoDbBenchmark.cs), we run concurrently 3 million random reads and 100K random writes.
+
+```
+BenchmarkDotNet=v0.13.5, OS=Windows 11 (10.0.22621.2134/22H2/2022Update/SunValley2)
+AMD Ryzen 7 5800H with Radeon Graphics, 1 CPU, 16 logical and 8 physical cores
+.NET SDK=7.0.400
+  [Host]     : .NET 7.0.10 (7.0.1023.36312), X64 RyuJIT AVX2
+  DefaultJob : .NET 7.0.10 (7.0.1023.36312), X64 RyuJIT AVX2
+
+|    Method | ReadThreadCount | WriteThreadCount | UsersCount | DbReadCount | DbWriteCount |     Mean |    Error |   StdDev | Allocated |
+|---------- |---------------- |----------------- |----------- |------------ |------------- |---------:|---------:|---------:|----------:|
+| ReadWrite |              30 |               30 |    4000000 |     3000000 |       100000 | 891.9 ms | 17.75 ms | 35.86 ms |  13.12 KB |
+```
+
 
 #### Intro to Stateful Services
 <p align="center">
@@ -50,12 +64,12 @@ public record Order : IEntity<Guid>
     public int Quantity { get; init; }
 }
 
-public record BooksSchema
+public class BooksSchema
 {
     public ITable<int, Book> Table { get; init; }
 }
 
-public record OrdersSchema
+public class OrdersSchema
 {
     public ITable<Guid, Order> Table { get; init; }
     public IValueIndex<int, Order> BookIdIndex { get; init; }
@@ -63,7 +77,7 @@ public record OrdersSchema
 
 // defines a DB schema that includes Orders and Books tables
 // and a secondary index: 'BookIdIndex' for the Orders table
-public record Schema
+public class Schema
 {
     public BooksSchema Books { get; }
     public OrdersSchema Orders { get; }
@@ -76,7 +90,6 @@ public record Schema
         };
 
         var ordersTable = StereoDbEngine.CreateTable<Guid, Order>();
-
 
         Orders = new OrdersSchema()
         {

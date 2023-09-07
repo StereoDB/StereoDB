@@ -1,0 +1,59 @@
+﻿version: '3.8'
+
+services:
+  nats:
+    image: 'nats:2.9.6'
+    command: --js
+    ports:
+      - '8222'
+      - '4222'
+  
+  redis-master:
+    image: 'redis:7.2.0'
+    command: 'redis-server --save "" --appendonly no --requirepass "" '
+    ports:
+      - '6379'
+    volumes:
+      - 'redis-data:/data'
+      - 'redis-conf:/etc/redis'
+    deploy:
+      placement:
+        constraints: [node.labels.node == redis-master ]
+      mode: global      
+      
+#  redis-slave:
+#    image: 'redis:7.2.0'
+#    command: 'redis-server --slaveof redis-master 6379 --save "" --appendonly no --requirepass "" '
+#    ports:
+#      - '6379'
+#    depends_on:
+#      - redis-master
+#    volumes:
+#      - 'redis-data:/data'
+#      - 'redis-conf:/etc/redis'
+#    deploy:
+#      placement:
+#        constraints: [ node.labels.node == redis-slave ]
+#      mode: global      
+      
+  nbomber:
+    image: 'antyadev/load-tests:v1.0.1'
+    command: '-c nbomber-config.json --cluster-agents-count=1'
+    depends_on:
+      - nats
+    configs:
+      - source: nbomber-config
+        target: /app/nbomber-config.json    
+    deploy:
+      placement:
+        constraints: [ node.labels.node == nbomber ]
+      mode: replicated
+      replicas: 2      
+      
+configs:
+  nbomber-config:
+    external: true      
+      
+volumes:
+  redis-data:
+  redis-conf:

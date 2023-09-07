@@ -39,7 +39,8 @@ public class StereoDbBenchmark
     private Db _db = new();
     private Random _random = new();
 
-    private Int64 CurrentDbWriteCount = 0;
+    private Int64 CurrentDbWriteCount1 = 0;
+    private Int64 CurrentDbWriteCount2 = 0;
     private Int64 CurrentDbReadCount = 0;
     
     [Params(30)] public int ReadThreadCount = 0;
@@ -70,14 +71,17 @@ public class StereoDbBenchmark
     {
         var writeOps = new TaskCompletionSource();
         var readOps = new TaskCompletionSource();
-        CurrentDbWriteCount = 0;
+        CurrentDbWriteCount1 = 0;
+        CurrentDbWriteCount2 = 0;
         CurrentDbReadCount = 0;
-
-        for (int i = 0; i < WriteThreadCount; i++)
+        var writeCount = DbWriteCount / 2;
+        var writeThreads = WriteThreadCount / 2;
+        
+        for (int i = 0; i < writeThreads; i++)
         {
             ThreadPool.QueueUserWorkItem(_ =>
             {
-                while (Interlocked.Read(ref CurrentDbWriteCount) <= DbWriteCount)
+                while (Interlocked.Read(ref CurrentDbWriteCount1) <= writeCount)
                 {
                     _db.WriteTransaction(ctx =>
                     {
@@ -88,7 +92,7 @@ public class StereoDbBenchmark
                         table.Set(randomUser);
                     });
 
-                    Interlocked.Increment(ref CurrentDbWriteCount);
+                    Interlocked.Increment(ref CurrentDbWriteCount1);
                 }
 
                 writeOps.TrySetResult();
@@ -116,6 +120,28 @@ public class StereoDbBenchmark
                 }
 
                 readOps.TrySetResult();
+            });
+        }
+        
+        for (int i = 0; i < writeThreads; i++)
+        {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                while (Interlocked.Read(ref CurrentDbWriteCount2) <= writeCount)
+                {
+                    _db.WriteTransaction(ctx =>
+                    {
+                        var index = _random.Next(0, _allData.Count - 1);
+                        var randomUser = _allData[index];
+
+                        var table = ctx.UseTable(ctx.Schema.Users.Table);
+                        table.Set(randomUser);
+                    });
+
+                    Interlocked.Increment(ref CurrentDbWriteCount2);
+                }
+
+                writeOps.TrySetResult();
             });
         }
 

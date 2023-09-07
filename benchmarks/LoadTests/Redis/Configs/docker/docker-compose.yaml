@@ -1,0 +1,29 @@
+﻿version: '3.8'
+
+services:
+  redis-master:
+    image: 'redis:7.2.0'
+    command: 'redis-server --save "" --appendonly no --requirepass "" '
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'redis-data:/data'
+      - 'redis-conf:/etc/redis'
+      
+#  redis-slave:
+#    image: 'redis:7.2.0'
+#    command: 'redis-server --slaveof redis-master 6379 --save "" --appendonly no --requirepass "" '
+#    ports:
+#      - '6479:6379'
+#    depends_on:
+#      - redis-master
+#    volumes:
+#      - 'redis-data:/data'
+#      - 'redis-conf:/etc/redis'
+#    deploy:
+#      mode: replicated
+#      replicas: 1
+      
+volumes:
+  redis-data:
+  redis-conf:

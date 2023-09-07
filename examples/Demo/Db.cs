@@ -19,12 +19,12 @@ public record Order : IEntity<Guid>
     public int Quantity { get; init; }
 }
 
-public record BooksSchema
+public class BooksSchema
 {
     public ITable<int, Book> Table { get; init; }
 }
 
-public record OrdersSchema
+public class OrdersSchema
 {
     public ITable<Guid, Order> Table { get; init; }
     public IValueIndex<int, Order> BookIdIndex { get; init; }
@@ -33,7 +33,7 @@ public record OrdersSchema
 
 // defines a DB schema that includes Orders and Books tables
 // and a secondary index: 'BookIdIndex' for the Orders table
-public record Schema
+public class Schema
 {
     public BooksSchema Books { get; }
     public OrdersSchema Orders { get; }
