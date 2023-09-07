@@ -22,7 +22,7 @@ Supported features:
 
 #### Benchmarks
 
-Pure in-process only (without persistance) benchmark for StereoDB. In [this benchmark](https://github.com/StereoDB/StereoDB/blob/dev/benchmarks/StereoDB.Benchmarks/Benchmarks/StereoDbBenchmark.cs), we run concurrently 3 million random reads and 100K random writes.
+Pure in-process only (without persistence) benchmark for StereoDB. In [this benchmark](https://github.com/StereoDB/StereoDB/blob/dev/benchmarks/StereoDB.Benchmarks/Benchmarks/StereoDbBenchmark.cs), **we run concurrently 3 million random reads and 100K random writes in 891 ms**.
 
 ```
 BenchmarkDotNet=v0.13.5, OS=Windows 11 (10.0.22621.2134/22H2/2022Update/SunValley2)
@@ -35,7 +35,6 @@ AMD Ryzen 7 5800H with Radeon Graphics, 1 CPU, 16 logical and 8 physical cores
 |---------- |---------------- |----------------- |----------- |------------ |------------- |---------:|---------:|---------:|----------:|
 | ReadWrite |              30 |               30 |    4000000 |     3000000 |       100000 | 891.9 ms | 17.75 ms | 35.86 ms |  13.12 KB |
 ```
-
 
 #### Intro to Stateful Services
 <p align="center">
