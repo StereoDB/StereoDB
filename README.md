@@ -22,7 +22,7 @@ Supported features:
 
 #### Benchmarks
 
-Pure in-process only (without persistence) benchmark for StereoDB. In [this benchmark](https://github.com/StereoDB/StereoDB/blob/dev/benchmarks/StereoDB.Benchmarks/Benchmarks/StereoDbBenchmark.cs), **we run concurrently 3 million random reads and 100K random writes in 891 ms**.
+Pure in-process only (without persistence) benchmark for StereoDB. In [this benchmark](https://github.com/StereoDB/StereoDB/blob/dev/benchmarks/StereoDB.Benchmarks/Benchmarks/StereoDbBenchmark.cs), **we run concurrently 3 million random reads and 100K random writes in 892 ms**.
 
 ```
 BenchmarkDotNet=v0.13.5, OS=Windows 11 (10.0.22621.2134/22H2/2022Update/SunValley2)
