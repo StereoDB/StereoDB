@@ -1,0 +1,48 @@
+﻿{
+  "ClusterSettings": {
+
+    "AutoCluster": {
+      "ClusterId": "test_cluster",
+      "NATSServerURL": "nats://nats",
+
+      "Coordinator": {
+        "TargetScenarios": ["redis_init"]
+      },
+
+      "Agent": {
+        "TargetScenarios": ["redis_read", "redis_write"],
+        "AgentsCount": 1
+      }
+    }
+
+  },
+
+  "GlobalSettings": {
+
+    "ScenariosSettings": [
+      {
+        "ScenarioName": "redis_read",
+        "WarmUpDuration": "00:00:05",
+
+        "LoadSimulationsSettings": [
+          { "KeepConstant": [100, "00:03:30"] }
+        ]
+      },
+
+      {
+        "ScenarioName": "redis_write",
+        "WarmUpDuration": "00:00:05",
+
+        "LoadSimulationsSettings": [
+          { "KeepConstant": [100, "00:03:30"] }
+        ]
+      }
+    ],
+
+    "GlobalCustomSettings": {
+      "ConnectionString": "redis-master:6379,redis-slave:6379",
+      "RecordsCount": 100000,
+      "RecordSize": 1000
+    }
+  }
+}
