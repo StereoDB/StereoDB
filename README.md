@@ -284,6 +284,45 @@ let test () =
     )    
 ```
 
+#### Transactions
+StereoDB transactions allow the execution of a group of commands in a single step. StereoDB provides Read-Only and Read-Write transactions.
+- Read-Only allows you only read data. **Also, they are multithreaded.**
+- Read-Write allows you read and write data. **They are running in a single-thread fashion.**
+
+What to expect from transactions in StereoDB:
+- they are blazingly fast and cheap to execute.
+- they guarantee you atomic and consistent updates (you can update several tables including secondary indexes in one transaction and no other concurrent transaction will read your data partially; the transaction cannot be observed to be in progress by another database client).
+- they don't support rollback since supporting rollbacks would have a significant impact on the simplicity and performance of StereoDB.
+
+In terms of ACID, StereoDB provides:
+TBD
+
+##### How to deal without rollbacks?
+- we suggest to use only immutable data types to model your data. In C#/F# you can use records/structs to achieve this. Immutable data types allow you to ignore partial failures while updating any data record in memory.
+- run all necessary validation before updating data in tables. Mutating your database should be the latest transaction step after all necessary validations are passed.
+
+```csharp
+// it's an example of WriteTransaction
+db.WriteTransaction(ctx =>
+{
+    var books = ctx.UseTable(ctx.Schema.Books.Table);    
+
+    // read record
+    var bookId = 42;
+    if (books.TryGet(bookId, out var book) && book.Quantity > 0)
+    {
+        // update record (it's immutable type, so the book instance wasn't mutated)        
+        var updatedBook = book with { Quantity = book.Quantity - 1 };
+
+        // and only after this you can safely mutate you state in database
+        books.Set(updatedBook);
+    }    
+});
+```
+
+#### Secondary indexes
+TBD
+
 #### Best practices
 TBD
 <!-- - closures (allocation)
