@@ -32,6 +32,13 @@ public class User : IEntity<Guid>
 
 public class DataGen
 {
+    public static byte[] GenerateRandomBytes(long sizeInBytes)
+    {
+        var buffer = new byte[sizeInBytes];
+        new Random().NextBytes(buffer);
+        return buffer;
+    }
+    
     public static List<User> GenerateUsers(int count = 10)
     {
         Randomizer.Seed = new Random(3897234);

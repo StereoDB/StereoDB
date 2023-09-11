@@ -6,15 +6,15 @@ namespace StereoDB.Benchmarks.Benchmarks;
 class UsersSchema
 {
     public ITable<Guid, User> Table { get; init; }
-    public IValueIndex<string, User> EmailIndex { get; init; }
+    //public IValueIndex<string, User> EmailIndex { get; init; }
 
     public UsersSchema()
     {
         var table = StereoDbEngine.CreateTable<Guid, User>();
-        var emailIndex = table.AddValueIndex(x => x.Email);
+        //var emailIndex = table.AddValueIndex(x => x.Email);
 
         Table = table;
-        EmailIndex = emailIndex;
+        //EmailIndex = emailIndex;
     }
 }
 
