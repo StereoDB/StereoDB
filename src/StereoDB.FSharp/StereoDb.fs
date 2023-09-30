@@ -17,6 +17,7 @@ type IStereoDb<'TSchema> =
     abstract ReadTransaction: transaction:(ReadOnlyTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> unit) -> unit
+    abstract ExecuteSql: sql: string -> unit
 
 type StereoDbEngine<'TSchema>(schema: 'TSchema) =
     
@@ -43,7 +44,12 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
             _lockSlim.EnterWriteLock()
             transaction _rwCtx
         finally
-            _lockSlim.ExitWriteLock()           
+            _lockSlim.ExitWriteLock()            
+        
+    member this.ExecuteSql(sql: string) =
+        let query = StereoDB.Sql.SqlParser.parseSql sql
+        printfn "%A" query
+        failwith "Not implemented"
                 
     static member CreateTable() =
         StereoDbTable<'TId, 'TEntity>()

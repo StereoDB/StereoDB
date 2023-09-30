@@ -21,6 +21,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Sql.fs" />
         <Compile Include="Table.fs" />
         <Compile Include="StereoDb.fs" />
     </ItemGroup>
@@ -32,6 +33,7 @@
 
     <ItemGroup>
         <PackageReference Update="FSharp.Core" Version="7.0.300" />
+        <PackageReference Include="FParsec" Version="2.0.0-beta2" />
         <PackageReference Include="StereoDB" Version="0.1.0-beta.2" />
     </ItemGroup>
 

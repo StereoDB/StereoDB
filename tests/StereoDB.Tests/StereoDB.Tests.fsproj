@@ -8,7 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="TestHelper.fs" />        
+        <Compile Include="TestHelper.fs" />
+        <Compile Include="SqlParsing.fs" />        
         <Compile Include="SecondaryIndex\RangeScanIndexTests.fs" />
         <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
