@@ -103,18 +103,44 @@ module internal SqlParser =
     let parseSql str =
         match run QUERY str with
         | Success(result, _, _)   ->
-            //printfn "Success: %A" result
             result
         | Failure(errorMsg, _, _) -> failwithf "Failure: %s" errorMsg
 
 module internal QueryBuilder =
     open SqlParser
 
-    let buildQuery (query: Query) =
+    type SchemaMetadata(schema) =
+        let schemaType = schema.GetType()
+        member this.TryGetTable tableName = 
+            let schemaProperty = schemaType.GetProperty(tableName)
+            if schemaProperty <> null then
+                Some schemaProperty
+            else None
+        member this.TryGetTableColumn tableName columnName = 
+            this.TryGetTable tableName
+                |> Option.bind (fun table -> 
+                        let columnProperty = table.PropertyType.GetProperty(columnName)
+                        if columnProperty <> null then
+                            Some columnProperty
+                        else None)
+
+    let buildQuery (query: Query) schema =
+        let metadata = SchemaMetadata(schema)
         match query with
         | SelectQuery (sel, body) ->
             let querySource = ()
             ()
-        | UpdateQuery (table, set, filter) ->
+        | UpdateQuery (tableName, set, filter) ->
+            let table = 
+                match metadata.TryGetTable tableName with
+                | Some t -> t
+                | None -> failwith $"Table {tableName} is not defined"
+            let findColumn column = 
+                let column = 
+                    match metadata.TryGetTableColumn tableName column with
+                    | Some c -> c
+                    | None -> failwith $"Column {column} does not exist in table {tableName}"
+                column
+            let setExpressions = set |> List.map (fun (column, expression) -> findColumn column) |> Seq.toArray
             let querySource = ()
             ()

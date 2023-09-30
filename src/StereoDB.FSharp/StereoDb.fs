@@ -2,6 +2,7 @@
 
 open System.Threading
 open StereoDB
+open StereoDB.Sql
 
 type ReadOnlyTsContext<'TSchema>(schema: 'TSchema) =    
     member this.Schema = schema
@@ -47,7 +48,8 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
             _lockSlim.ExitWriteLock()            
         
     member this.ExecuteSql(sql: string) =
-        let query = StereoDB.Sql.SqlParser.parseSql sql
+        let query = SqlParser.parseSql sql
+        let func = QueryBuilder.buildQuery query schema
         printfn "%A" query
         failwith "Not implemented"
                 
