@@ -1,6 +1,8 @@
 ﻿namespace StereoDB.Sql
 
 open FParsec
+open System.Linq.Expressions
+open StereoDB.FSharp
 
 module internal SqlParser =
 
@@ -8,6 +10,7 @@ module internal SqlParser =
     let str_ws s = pstring s .>> ws
     let strCI_ws s = pstringCI s .>> ws
     let float_ws = pfloat .>> ws
+    let int_ws = pint64 .>> ws
 
     let identifier =
         let isIdentifierFirstChar c = isLetter c || c = '_'
@@ -18,6 +21,7 @@ module internal SqlParser =
     let identifier_ws = identifier .>> ws
 
     type SqlPrimitiveExpression = 
+        | SqlIntConstant of int64
         | SqlFloatConstant of float
         | SqlIdentifier of string
     type SqlExpression = 
@@ -49,9 +53,10 @@ module internal SqlParser =
     | SelectQuery of (SelectClause * (FromClause * WhereClause option) option)
     | UpdateQuery of (string * SetClause * WhereClause option)
 
-    let SQL_CONSTANT = float_ws |>> SqlFloatConstant
+    let SQL_INT_CONSTANT = int_ws |>> SqlIntConstant
+    let SQL_FLOAT_CONSTANT = float_ws |>> SqlFloatConstant
     let SQL_IDENTIFIER = identifier |>> SqlIdentifier
-    let SQL_EXPRESSION = SQL_CONSTANT <|> SQL_IDENTIFIER |>> Primitive
+    let SQL_EXPRESSION = SQL_INT_CONSTANT <|> SQL_FLOAT_CONSTANT <|> SQL_IDENTIFIER |>> Primitive
 
     let arithOpp = new OperatorPrecedenceParser<SqlExpression,unit,unit>()
     let arithExpr = arithOpp.ExpressionParser
@@ -114,24 +119,26 @@ module internal QueryBuilder =
         member this.TryGetTable tableName = 
             let schemaProperty = schemaType.GetProperty(tableName)
             if schemaProperty <> null then
-                Some schemaProperty
+                let tableEntityType = schemaProperty.PropertyType.GenericTypeArguments[0].GenericTypeArguments[1]
+                let keyType = tableEntityType.GetInterfaces() |> Seq.find (fun ifType -> ifType.Name = "IEntity`1")
+                Some (schemaProperty, tableEntityType, keyType.GenericTypeArguments[0])
             else None
         member this.TryGetTableColumn tableName columnName = 
             this.TryGetTable tableName
-                |> Option.bind (fun table -> 
-                        let columnProperty = table.PropertyType.GetProperty(columnName)
+                |> Option.bind (fun (tableProperty, entityType, keyType) -> 
+                        let columnProperty = entityType.GetProperty(columnName)
                         if columnProperty <> null then
                             Some columnProperty
                         else None)
 
-    let buildQuery (query: Query) schema =
+    let buildQuery<'TSchema> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
         match query with
         | SelectQuery (sel, body) ->
             let querySource = ()
             ()
         | UpdateQuery (tableName, set, filter) ->
-            let table = 
+            let (table, tableEntityType, keyType) = 
                 match metadata.TryGetTable tableName with
                 | Some t -> t
                 | None -> failwith $"Table {tableName} is not defined"
@@ -141,6 +148,34 @@ module internal QueryBuilder =
                     | Some c -> c
                     | None -> failwith $"Column {column} does not exist in table {tableName}"
                 column
-            let setExpressions = set |> List.map (fun (column, expression) -> findColumn column) |> Seq.toArray
+            let contextType = typeof<ReadWriteTsContext<'TSchema>>
+            let schemaType = typeof<'TSchema>
+            let context = Expression.Parameter(contextType, "context")
+            let schemaAccess = Expression.Property(context, "Schema")
+            let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
+            let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
+            let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
+            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
+            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+
+            let row = Expression.Parameter(tableEntityType, "row");
+            let buildExpression expression :Expression =
+                match expression with
+                | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
+                | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
+                | Primitive primitive ->
+                    match primitive with
+                    | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
+                    | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
+                    | SqlIdentifier identifier -> Expression.Property(tableAccessor, findColumn identifier)
+
+            let setExpressions = set |> List.map (fun (column, expression) -> 
+                let columnExpression = Expression.Property(row, findColumn column)
+                let assignment = Expression.Assign(columnExpression, buildExpression expression)
+                //let assignment = Expression.Bind(Expression.Property(row, findColumn column).Expression
+                assignment :> Expression)
+            let updateBlock = Expression.Block(setExpressions)
+            let updateProjection = Expression.Lambda (updateBlock, row)
+            updateProjection.Compile() |> ignore
             let querySource = ()
             ()

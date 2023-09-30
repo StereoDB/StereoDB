@@ -4,16 +4,6 @@ open System.Threading
 open StereoDB
 open StereoDB.Sql
 
-type ReadOnlyTsContext<'TSchema>(schema: 'TSchema) =    
-    member this.Schema = schema
-    member inline this.UseTable(table: ITable<'TId, 'TEntity>) =
-        table :?> IReadOnlyTable<'TId, 'TEntity>
-
-type ReadWriteTsContext<'TSchema>(schema: 'TSchema) =
-    member this.Schema = schema        
-    member inline this.UseTable(table: ITable<'TId, 'TEntity>) =
-        table :?> IReadWriteTable<'TId, 'TEntity>
-
 type IStereoDb<'TSchema> =
     abstract ReadTransaction: transaction:(ReadOnlyTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> 'T voption) -> 'T voption
@@ -49,7 +39,7 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
         
     member this.ExecuteSql(sql: string) =
         let query = SqlParser.parseSql sql
-        let func = QueryBuilder.buildQuery query schema
+        let func = QueryBuilder.buildQuery<'TSchema> query _rwCtx schema
         printfn "%A" query
         failwith "Not implemented"
                 

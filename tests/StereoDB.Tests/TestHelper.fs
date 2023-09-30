@@ -7,7 +7,8 @@ open StereoDB.FSharp
 type Book = {
     Id: int
     Title: string
-    Quantity: int
+    // This is temporary workaround until UPDATE can support records
+    mutable Quantity: int
 }
 with
     interface IEntity<int> with
