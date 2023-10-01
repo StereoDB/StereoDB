@@ -111,8 +111,83 @@ module internal SqlParser =
             result
         | Failure(errorMsg, _, _) -> failwithf "Failure: %s" errorMsg
 
+module Expr = 
+    open System.Reflection
+    open FSharp.Quotations.DerivedPatterns
+    open FSharp.Quotations.Patterns
+    let onlyVar = function Var v -> Some v | _ -> None
+
+    let (|Property|_|) = function
+        | PropertyGet(_, info, _) -> Some info
+        | Lambda(arg, PropertyGet(Some(Var var), info, _))
+        | Let(arg, _, PropertyGet(Some(Var var), info, _))
+            when arg = var -> Some info
+        | _ -> None
+
+    let private (|LetInCall|_|) expr =
+        let rec loop e collectedArgs =
+            match e with
+            | Let(arg, _, exp2) ->  
+                let newArgs = Set.add arg collectedArgs
+                loop exp2 newArgs
+            | Call(_instance, mi, args) ->
+                let setOfCallArgs =
+                    args
+                    |> List.choose onlyVar
+                    |> Set.ofList
+                if Set.isSubset setOfCallArgs collectedArgs then
+                    Some mi
+                else None
+            | _ -> None
+        loop expr Set.empty
+
+    let private (|Func|_|) = function
+        // function values without arguments
+        | Lambda (arg, Call (target, info, []))
+            when arg.Type = typeof<unit> -> Some (target, info)
+        // function values with one argument
+        | Lambda (arg, Call (target, info, [Var var]))
+            when arg = var -> Some (target, info)
+        // function values with a set of curried or tuple arguments
+        | Lambdas (args, Call (target, info, exprs)) ->
+            let justArgs = List.choose onlyVar exprs
+            let allArgs = List.concat args
+            if justArgs = allArgs then
+                Some (target, info)
+            else None
+        | Lambdas(_args, _body) ->
+            None
+        | _ -> None
+
+    let (|Method|_|) = function
+        // any ordinary calls: foo.Bar ()
+        | Call (_, info, _) -> Some info
+        // calls and function values via a lambda argument:
+        // fun (x: string) -> x.Substring (1, 2)
+        // fun (x: string) -> x.StartsWith
+        | Lambda (arg, Call (Some (Var var), info, _))
+        | Lambda (arg, Func (Some (Var var), info))
+            when arg = var -> Some info
+        // any function values:someString.StartsWith
+        | Func (_, info) -> Some info
+        // calls and function values ​​via instances:
+        // "abc" .StartsWith ("a")
+        // "abc" .Substring
+        | Let (arg, _, Call (Some (Var var), info, _))
+        | Let (arg, _, Func (Some (Var var), info))
+            when arg = var -> Some info
+        | LetInCall(info) -> Some info
+        | _ -> None
+        
+    /// Get a MethodInfo from an expression that is a method call or a function type value
+    let methodof = function Method mi -> mi | _ -> failwith "Not a method expression"
+
 module internal QueryBuilder =
     open SqlParser
+
+    type QueryExecution<'TSchema> =
+        | Write of System.Action<ReadWriteTsContext<'TSchema>>
+        | Read of unit
 
     type SchemaMetadata(schema) =
         let schemaType = schema.GetType()
@@ -131,12 +206,18 @@ module internal QueryBuilder =
                             Some columnProperty
                         else None)
 
+    let iter<'T> (action: System.Action<'T>) (seq: 'T voption seq) =
+        Seq.iter (fun x ->
+            match x with 
+            | ValueSome x -> action.Invoke(x)
+            | _ -> ()) seq
+
     let buildQuery<'TSchema> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
         match query with
         | SelectQuery (sel, body) ->
             let querySource = ()
-            ()
+            Read ()
         | UpdateQuery (tableName, set, filter) ->
             let (table, tableEntityType, keyType) = 
                 match metadata.TryGetTable tableName with
@@ -150,14 +231,13 @@ module internal QueryBuilder =
                 column
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let schemaType = typeof<'TSchema>
-            let context = Expression.Parameter(contextType, "context")
-            let schemaAccess = Expression.Property(context, "Schema")
-            let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
-            let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
-            let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
-            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
-            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+            let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
+            let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
+            // Build Update projection
+            // let updateProjection = fun row -> 
+            //   row.Quantity = 100
+            //   ()
             let row = Expression.Parameter(tableEntityType, "row");
             let buildExpression expression :Expression =
                 match expression with
@@ -167,15 +247,52 @@ module internal QueryBuilder =
                     match primitive with
                     | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
                     | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                    | SqlIdentifier identifier -> Expression.Property(tableAccessor, findColumn identifier)
+                    | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
 
             let setExpressions = set |> List.map (fun (column, expression) -> 
                 let columnExpression = Expression.Property(row, findColumn column)
                 let assignment = Expression.Assign(columnExpression, buildExpression expression)
-                //let assignment = Expression.Bind(Expression.Property(row, findColumn column).Expression
                 assignment :> Expression)
             let updateBlock = Expression.Block(setExpressions)
-            let updateProjection = Expression.Lambda (updateBlock, row)
-            updateProjection.Compile() |> ignore
-            let querySource = ()
-            ()
+            let updateLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
+            let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+
+            // Build Table scan
+            // let tableScan entity = 
+            //     let ids = entity.GetIds()
+            //     ids
+            //         |> System.Linq.Enumerable.Select (fun id -> entity.Get id)
+            let entity = Expression.Parameter(rwt, "entity")
+            let getIdsCall = Expression.Call(entity, rot.GetMethod("GetIds"))
+            
+            let x = Expression.Parameter(keyType, "x")
+            let enumerableType = typeof<System.Linq.Enumerable>
+            
+            let getMethod = rot.GetMethod("Get")
+            let getIdLambda = Expression.Lambda (Expression.Call(entity, getMethod, x), x)
+            let selectMethod = enumerableType.GetMethods() |> Seq.filter (fun c -> c.Name = "Select") |> Seq.head
+            let result = Expression.Call(selectMethod.MakeGenericMethod(keyType, getMethod.ReturnType), getIdsCall, getIdLambda)
+            let tableScanExpresion = Expression.Lambda (result, entity)
+
+            // Composing things
+            let seqIter = Expr.methodof <@ iter @>            
+            let context = Expression.Parameter(contextType, "context")
+            let schemaAccess = Expression.Property(context, "Schema")
+            let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
+            let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
+            let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
+            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
+            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+            
+            let actualTable = Expression.Variable(rwt, "actualTable");
+            let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
+            let tableScanResultType = typeof<seq<_>>.GetGenericTypeDefinition().MakeGenericType(typeof<obj voption>.GetGenericTypeDefinition().MakeGenericType(tableEntityType))
+            let tableScan = Expression.Variable(typeof<System.Func<_, _>>.GetGenericTypeDefinition().MakeGenericType(rwt, tableScanResultType), "tableScan");
+            let tableScanAssignment = Expression.Assign(tableScan, tableScanExpresion)
+            let createTableScanExpression = Expression.Invoke(tableScan, actualTable)
+            let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), updateProjectionExpresion, createTableScanExpression)
+            let letFunction = Expression.Block([| actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultExpression)
+            let resultLambdaType = typeof<System.Action<ReadWriteTsContext<'TSchema>>>
+            let writeTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
+            
+            Write (writeTransaction.Compile() :?> System.Action<ReadWriteTsContext<'TSchema>>)

@@ -41,7 +41,10 @@ type StereoDbEngine<'TSchema>(schema: 'TSchema) =
         let query = SqlParser.parseSql sql
         let func = QueryBuilder.buildQuery<'TSchema> query _rwCtx schema
         printfn "%A" query
-        failwith "Not implemented"
+        match func with
+        | QueryBuilder.Write caller ->
+            this.WriteTransaction (fun x -> caller.Invoke x)
+        | QueryBuilder.Read _ -> failwith "Not implemented"
                 
     static member CreateTable() =
         StereoDbTable<'TId, 'TEntity>()
