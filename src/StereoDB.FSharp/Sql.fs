@@ -212,6 +212,28 @@ module internal QueryBuilder =
             | ValueSome x -> action.Invoke(x)
             | _ -> ()) seq
 
+    let buildTableScan tableEntityType keyType =
+        let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
+        let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
+
+        // Build Table scan
+        // let tableScan entity = 
+        //     let ids = entity.GetIds()
+        //     ids
+        //         |> System.Linq.Enumerable.Select (fun id -> entity.Get id)
+        let entity = Expression.Parameter(rwt, "entity")
+        let getIdsCall = Expression.Call(entity, rot.GetMethod("GetIds"))
+            
+        let x = Expression.Parameter(keyType, "x")
+        let enumerableType = typeof<System.Linq.Enumerable>
+            
+        let getMethod = rot.GetMethod("Get")
+        let getIdLambda = Expression.Lambda (Expression.Call(entity, getMethod, x), x)
+        let selectMethod = enumerableType.GetMethods() |> Seq.filter (fun c -> c.Name = "Select") |> Seq.head
+        let result = Expression.Call(selectMethod.MakeGenericMethod(keyType, getMethod.ReturnType), getIdsCall, getIdLambda)
+        let tableScanExpresion = Expression.Lambda (result, entity)
+        tableScanExpresion
+
     let buildQuery<'TSchema> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
         match query with
@@ -232,50 +254,60 @@ module internal QueryBuilder =
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let schemaType = typeof<'TSchema>
             let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
-            let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
-            // Build Update projection
-            // let updateProjection = fun row -> 
-            //   row.Quantity = 100
-            //   ()
-            let row = Expression.Parameter(tableEntityType, "row");
-            let buildExpression expression :Expression =
-                match expression with
-                | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
-                | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
-                | Primitive primitive ->
-                    match primitive with
-                    | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
-                    | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                    | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
+            let buildUpdateProjection actualTable =
+                // Build Update projection
+                // let updateProjection = fun row -> 
+                //   row.Quantity = 100
+                //   ()
+                let row = Expression.Parameter(tableEntityType, "row");
+                let buildExpression expression :Expression =
+                    match expression with
+                    | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
+                    | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
+                    | Primitive primitive ->
+                        match primitive with
+                        | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
+                        | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
+                        | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
 
-            let setExpressions = set |> List.map (fun (column, expression) -> 
-                let columnExpression = Expression.Property(row, findColumn column)
-                let assignment = Expression.Assign(columnExpression, buildExpression expression)
-                assignment :> Expression)
-            let updateBlock = Expression.Block(setExpressions)
-            let updateLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
-            let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+                let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (findColumn column).CanWrite)
+                let updateBlock: Expression = 
+                    if allPropertiesWriteable then
+                        // directly update property
+                        let setExpressions = set |> List.map (fun (column, expression) -> 
+                            let newValueExpression = buildExpression expression
+                            let targetProperty = findColumn column
+                            let columnExpression = Expression.Property(row, targetProperty)
+                            let assignment = Expression.Assign(columnExpression, newValueExpression)
+                            assignment :> Expression)
+                        Expression.Block(setExpressions)
+                    else
+                        let setMethod = rwt.GetMethod("Set")
+                        let constructorParameters =
+                            tableEntityType.GetProperties() |> Array.map (fun prop -> 
+                                let shouldBeUpdated = set |> Seq.tryFind (fun (c, e) -> c = prop.Name)
+                                match shouldBeUpdated with
+                                | Some (column, expression) -> 
+                                    let newValueExpression = buildExpression expression
+                                    newValueExpression
+                                | None -> Expression.Property(row, prop)
+                                )
+                        let constructor = tableEntityType.GetConstructors() |> Seq.head
+                        let createNew = Expression.New(constructor, constructorParameters)
+                        Expression.Call(actualTable, setMethod, createNew)
 
-            // Build Table scan
-            // let tableScan entity = 
-            //     let ids = entity.GetIds()
-            //     ids
-            //         |> System.Linq.Enumerable.Select (fun id -> entity.Get id)
-            let entity = Expression.Parameter(rwt, "entity")
-            let getIdsCall = Expression.Call(entity, rot.GetMethod("GetIds"))
-            
-            let x = Expression.Parameter(keyType, "x")
-            let enumerableType = typeof<System.Linq.Enumerable>
-            
-            let getMethod = rot.GetMethod("Get")
-            let getIdLambda = Expression.Lambda (Expression.Call(entity, getMethod, x), x)
-            let selectMethod = enumerableType.GetMethods() |> Seq.filter (fun c -> c.Name = "Select") |> Seq.head
-            let result = Expression.Call(selectMethod.MakeGenericMethod(keyType, getMethod.ReturnType), getIdsCall, getIdLambda)
-            let tableScanExpresion = Expression.Lambda (result, entity)
+                let updateLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
+                let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+                updateProjectionExpresion
 
             // Composing things
-            let seqIter = Expr.methodof <@ iter @>            
+            //
+            // let actualTable = ctx.UseTable(ctx.Schema.Books.Table)
+            // tableScan actualTable
+            //     |> Seq.filter whereFilter
+            //     |> Seq.iter updateProjection
+            let seqIter = Expr.methodof <@ iter @>
             let context = Expression.Parameter(contextType, "context")
             let schemaAccess = Expression.Property(context, "Schema")
             let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
@@ -283,13 +315,19 @@ module internal QueryBuilder =
             let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
             let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
             let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
-            
             let actualTable = Expression.Variable(rwt, "actualTable");
             let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
+
+            let updateProjectionExpresion = buildUpdateProjection actualTable
+            let tableScanExpresion = buildTableScan tableEntityType keyType
+
+            // Create table scan
             let tableScanResultType = typeof<seq<_>>.GetGenericTypeDefinition().MakeGenericType(typeof<obj voption>.GetGenericTypeDefinition().MakeGenericType(tableEntityType))
             let tableScan = Expression.Variable(typeof<System.Func<_, _>>.GetGenericTypeDefinition().MakeGenericType(rwt, tableScanResultType), "tableScan");
             let tableScanAssignment = Expression.Assign(tableScan, tableScanExpresion)
             let createTableScanExpression = Expression.Invoke(tableScan, actualTable)
+
+            // Apply update to each object
             let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), updateProjectionExpresion, createTableScanExpression)
             let letFunction = Expression.Block([| actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultExpression)
             let resultLambdaType = typeof<System.Action<ReadWriteTsContext<'TSchema>>>

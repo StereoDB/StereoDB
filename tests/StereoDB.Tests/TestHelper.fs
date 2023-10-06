@@ -7,12 +7,21 @@ open StereoDB.FSharp
 type Book = {
     Id: int
     Title: string
-    // This is temporary workaround until UPDATE can support records
-    mutable Quantity: int
+    Quantity: int
 }
 with
     interface IEntity<int> with
         member this.Id = this.Id        
+
+type MutableBook = {
+    Id: int
+    Title: string
+    ISBN: string
+    mutable Quantity: int
+}
+with
+    interface IEntity<int> with
+        member this.Id = this.Id
         
 type Order = {
     Id: Guid
@@ -25,6 +34,7 @@ with
 
 type Schema() =
     let _books = {| Table = StereoDbEngine.CreateTable<int, Book>() |}
+    let _mutableBooks = {| Table = StereoDbEngine.CreateTable<int, MutableBook>() |}
     
     let _ordersTable = StereoDbEngine.CreateTable<Guid, Order>()
     let _orders = {|
@@ -34,6 +44,7 @@ type Schema() =
     |}
     
     member this.Books = _books
+    member this.MutableBooks = _mutableBooks
     member this.Orders = _orders
 
 type Db() =    
