@@ -8,7 +8,7 @@ type IStereoDb<'TSchema> =
     abstract ReadTransaction: transaction:(ReadOnlyTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> unit) -> unit
-    abstract ExecuteSql: sql: string -> unit
+    abstract ExecuteNonQuery: sql: string -> unit
 
 type StereoDbEngine<'TSchema>(schema: 'TSchema) =
     
