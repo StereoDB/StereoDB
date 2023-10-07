@@ -8,7 +8,7 @@ open StereoDB.FSharp
 
 let sqlCompilationFailure (db: IStereoDb<Schema>) sql expectedError = 
     try
-        db.ExecuteNonQuery sql
+        db.ExecuteSql sql
         Assert.True(false, "Should not happens")
     with ex ->
         Assert.Equal (expectedError, ex.Message)
@@ -38,7 +38,7 @@ let ``Update using other field`` () =
             books.Set book
     )
 
-    db.ExecuteNonQuery "UPDATE Books SET Quantity = Id"
+    db.ExecuteSql "UPDATE Books SET Quantity = Id"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
@@ -69,7 +69,7 @@ let ``Update using other field for mutable record`` () =
             books.Set book
     )
 
-    db.ExecuteNonQuery "UPDATE MutableBooks SET Quantity = Id"
+    db.ExecuteSql "UPDATE MutableBooks SET Quantity = Id"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.MutableBooks.Table)
@@ -100,7 +100,7 @@ let ``Update all rows in table`` () =
             books.Set book
     )
 
-    db.ExecuteNonQuery "UPDATE Books SET Quantity = 2"
+    db.ExecuteSql "UPDATE Books SET Quantity = 2"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
@@ -117,3 +117,31 @@ let ``Update all rows in table`` () =
     test <@ book1.Quantity = 2 @>
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 2 @>
+
+type SubBook =
+    {
+        Id: int
+        Quantity: int
+    }
+
+[<Fact>]
+let ``Select all rows`` () =
+    let db = Db.Create()   
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        
+        for i in [1..10] do
+            let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
+            books.Set book
+    )
+
+    let result = db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books"
+    
+    let booksCount = result.Value.Count
+    test <@ booksCount = 10 @>
+    let book1 = result.Value[0]
+    test <@ book1.Id = 1 @>
+    let book2 = result.Value[1]
+    test <@ book2.Id = 2 @>
