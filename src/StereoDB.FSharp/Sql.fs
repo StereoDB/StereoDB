@@ -76,18 +76,16 @@ module internal SqlParser =
 
     let logicOpp = new OperatorPrecedenceParser<SqlLogicalExpression,unit,unit>()
     let SQL_LOGICAL_EXPRESSION = logicOpp.ExpressionParser
+    let logicalOperator = str_ws "=" <|> str_ws "<=" <|> str_ws ">=" <|> str_ws "<>" <|> str_ws ">" <|> str_ws "<"
     let primitiveLogicalExpression =
         (SQL_EXPRESSION .>>? strCI_ws "IS" .>>? strCI_ws "NULL" |>> IsNull)
         <|> (SQL_EXPRESSION .>>? strCI_ws "IS" .>>? strCI_ws "NOT" .>> strCI_ws "NULL" |>> IsNotNull)
-        <|> (SQL_EXPRESSION .>>.? strCI_ws "=" .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
-        <|> (SQL_EXPRESSION .>>.? strCI_ws "<>" .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
-        <|> (SQL_EXPRESSION .>>.? strCI_ws ">=" .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
-        <|> (SQL_EXPRESSION .>>.? strCI_ws "<=" .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
+        <|> (SQL_EXPRESSION .>>.? logicalOperator .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
     let logicExpressionTerm = (primitiveLogicalExpression) <|> between (str_ws "(") (str_ws ")") SQL_LOGICAL_EXPRESSION
     logicOpp.TermParser <- logicExpressionTerm
 
-    logicOpp.AddOperator(InfixOperator("AND", ws, 1, Associativity.Left, fun x y -> BinaryLogicalOperator(x, "+", y)))
-    logicOpp.AddOperator(InfixOperator("OR", ws, 1, Associativity.Left, fun x y -> BinaryLogicalOperator(x, "-", y)))
+    logicOpp.AddOperator(InfixOperator("AND", ws, 1, Associativity.Left, fun x y -> BinaryLogicalOperator(x, "AND", y)))
+    logicOpp.AddOperator(InfixOperator("OR", ws, 1, Associativity.Left, fun x y -> BinaryLogicalOperator(x, "OR", y)))
     logicOpp.AddOperator(PrefixOperator("NOT", ws, 3, false, fun x -> UnaryLogicalOperator("NOT", x)))
 
     let ALIASED_EXPRESSION = SQL_EXPRESSION .>>. opt (strCI_ws "AS" >>. identifier) |>> AliasedExpression
@@ -220,6 +218,12 @@ module internal QueryBuilder =
             | ValueSome x -> action.Invoke(x)
             | _ -> failwith "Cannot apply SELECT on non-row") seq
 
+    let filter (action: System.Func<'T, bool>) (seq: 'T voption seq) =
+        Seq.filter (fun x ->
+            match x with 
+            | ValueSome x -> action.Invoke(x)
+            | _ -> false) seq
+
     let buildTableScan tableType tableEntityType keyType =
         let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
@@ -280,22 +284,40 @@ module internal QueryBuilder =
                         | None -> failwith $"Column {column} does not exist in table {tableName}"
                     column
 
+                let buildExpression row expression :Expression =
+                    match expression with
+                    | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
+                    | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
+                    | Primitive primitive ->
+                        match primitive with
+                        | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
+                        | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
+                        | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
+
+                let buildLogicExpression row expression :Expression =
+                    match expression with
+                    | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
+                    | BinaryComparisonOperator (left, op, right) ->
+                        let leftExpression = buildExpression row left
+                        let rightExpression = buildExpression row right
+                        match op with
+                        | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
+                        | "<" -> Expression.LessThan(leftExpression, rightExpression)
+                        | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
+                        | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
+                        | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
+                        | "=" -> Expression.Equal(leftExpression, rightExpression)
+                        | _ -> failwith $"Operator {op} is not implemented"
+                    | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
+                    | IsNull (expr) -> failwith "Not implemented"
+                    | IsNotNull (expr) -> failwith "Not implemented"
+
                 let buildSelectProjection () =
                     // Build Update projection
                     // let updateProjection = fun row -> 
                     //   row.Quantity = 100
                     //   ()
                     let row = Expression.Parameter(tableEntityType, "row");
-                    let buildExpression expression :Expression =
-                        match expression with
-                        | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
-                        | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
-                        | Primitive primitive ->
-                            match primitive with
-                            | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
-                            | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                            | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
-
                     let namedSelect = 
                         sel |> List.map (fun x ->
                             match x with
@@ -314,7 +336,7 @@ module internal QueryBuilder =
                                 let shouldBeUpdated = namedSelect |> Seq.tryFind (fun (alias, expr) -> alias = prop.Name)
                                 match shouldBeUpdated with
                                 | Some (column, expression) -> 
-                                    let newValueExpression = buildExpression expression
+                                    let newValueExpression = buildExpression row expression
                                     newValueExpression
                                 | None -> Expression.Property(row, prop)
                                 )
@@ -323,6 +345,19 @@ module internal QueryBuilder =
                         createNew
 
                     let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, selectProjectionType)
+                    let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+                    updateProjectionExpresion
+
+                let buildFilterProjection whereExpression =
+                    // Build Update projection
+                    // let whereProjection = fun row -> 
+                    //   row.Quantity <= 100
+                    //   ()
+                    let row = Expression.Parameter(tableEntityType, "row");
+
+                    let updateBlock: Expression = buildLogicExpression row whereExpression
+
+                    let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
                     let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
                     updateProjectionExpresion
 
@@ -348,12 +383,20 @@ module internal QueryBuilder =
                 let result = Expression.Variable(resultsetType, "result");
                 let resultAssignment = Expression.Assign(result, createNew)
 
+                let filteredResult : Expression =
+                    match whereClause with
+                    | Some(WhereCondition(whereExpression)) -> 
+                        let condition = buildFilterProjection whereExpression
+                        let seqFilter = Expr.methodof <@ filter @>
+                        let filterExpression = Expression.Call(seqFilter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), condition, createTableScanExpression)
+                        filterExpression
+                    | _ -> createTableScanExpression
+
                 // Apply select to each object
                 let seqIter = Expr.methodof <@ map @>
-                let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, createTableScanExpression)
+                let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, filteredResult)
                 let addRangeCall = Expression.Call(result, resultsetType.GetMethod("AddRange"), resultExpression);
                 let letFunction = Expression.Block([| result; actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultAssignment, addRangeCall, result)
-                //let letFunction = Expression.Block([| result |], resultAssignment)
                 let resultLambdaType = typeof<System.Func<ReadOnlyTsContext<'TSchema>, obj>>
                 let readTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
                 Read (readTransaction.Compile() :?> System.Func<ReadOnlyTsContext<'TSchema>, obj>)
