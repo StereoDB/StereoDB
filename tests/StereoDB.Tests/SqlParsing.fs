@@ -31,7 +31,7 @@ let ``Update using other field`` () =
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
@@ -62,7 +62,7 @@ let ``Update with WHERE`` () =
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
@@ -89,11 +89,11 @@ let ``Update with WHERE`` () =
 
 [<Fact>]
 let ``Update using other field for mutable record`` () =
-    let db = Db.Create()   
+    let db = Db.Create()
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.MutableBooks.Table)        
+        let books = ctx.UseTable(ctx.Schema.MutableBooks.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1; ISBN = "ISBN" }
@@ -120,11 +120,11 @@ let ``Update using other field for mutable record`` () =
 
 [<Fact>]
 let ``Update all rows in table`` () =
-    let db = Db.Create()   
+    let db = Db.Create()
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
@@ -157,11 +157,11 @@ type SubBook =
 
 [<Fact>]
 let ``Select all rows`` () =
-    let db = Db.Create()   
+    let db = Db.Create()
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
@@ -179,11 +179,11 @@ let ``Select all rows`` () =
 
 [<Fact>]
 let ``Select filtered rows`` () =
-    let db = Db.Create()   
+    let db = Db.Create()
     
     // add books
     db.WriteTransaction(fun ctx ->
-        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
