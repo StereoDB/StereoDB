@@ -52,6 +52,7 @@ module internal SqlParser =
     type Query =
     | SelectQuery of (SelectClause * (FromClause * WhereClause option) option)
     | UpdateQuery of (string * SetClause * WhereClause option)
+    | DeleteQuery of (string * WhereClause option)
 
     let SQL_INT_CONSTANT = int_ws |>> SqlIntConstant
     let SQL_FLOAT_CONSTANT = float_ws |>> SqlFloatConstant
@@ -103,7 +104,11 @@ module internal SqlParser =
         spaces .>> strCI_ws "UPDATE" >>. identifier_ws .>>. SET_LIST .>>. 
         (opt (WHERE_CLAUSE)) |>> flatten |>> UpdateQuery
 
-    let QUERY = SELECT_STATEMENT <|> UPDATE_STATEMENT
+    let DELETE_STATEMENT =
+        spaces .>> strCI_ws "DELETE" >>. strCI_ws "FROM" >>. identifier_ws .>>. 
+        (opt (WHERE_CLAUSE)) |>> DeleteQuery
+
+    let QUERY = SELECT_STATEMENT <|> UPDATE_STATEMENT <|> DELETE_STATEMENT
 
     let parseSql str =
         match run QUERY str with
@@ -211,6 +216,12 @@ module internal QueryBuilder =
             match x with 
             | ValueSome x -> action.Invoke(x)
             | _ -> ()) seq
+
+    let iterMaterialize<'T> (action: System.Action<'T>) (seq: 'T voption seq) =
+        Seq.iter (fun x ->
+            match x with 
+            | ValueSome x -> action.Invoke(x)
+            | _ -> ()) (seq |> Seq.toList)
 
     let map (action: System.Func<'T, 'TResult>) (seq: 'T voption seq) =
         Seq.map (fun x ->
@@ -430,6 +441,10 @@ module internal QueryBuilder =
                 // let updateProjection = fun row -> 
                 //   row.Quantity = 100
                 //   ()
+                // OR
+                // let updateProjection = fun row -> 
+                //   activeTable.Set({ row with Quantity = 100 })
+                //   ()
                 let row = Expression.Parameter(tableEntityType, "row");
 
                 let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (findColumn column).CanWrite)
@@ -530,6 +545,120 @@ module internal QueryBuilder =
             // Apply update to each object
             let seqIter = Expr.methodof <@ iter @>
             let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), updateProjectionExpresion, filteredResult)
+            let letFunction = Expression.Block([| actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultExpression)
+            let resultLambdaType = typeof<System.Action<ReadWriteTsContext<'TSchema>>>
+            let writeTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
+            
+            Write (writeTransaction.Compile() :?> System.Action<ReadWriteTsContext<'TSchema>>)
+        | DeleteQuery (tableName, whereClause) ->
+            let (table, tableEntityType, keyType) = 
+                match metadata.TryGetTable tableName with
+                | Some t -> t
+                | None -> failwith $"Table {tableName} is not defined"
+            let findColumn column = 
+                let column = 
+                    match metadata.TryGetTableColumn tableName column with
+                    | Some c -> c
+                    | None -> failwith $"Column {column} does not exist in table {tableName}"
+                column
+            let contextType = typeof<ReadWriteTsContext<'TSchema>>
+            let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
+
+            let buildExpression row expression :Expression =
+                match expression with
+                | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
+                | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
+                | Primitive primitive ->
+                    match primitive with
+                    | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
+                    | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
+                    | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
+
+            let buildDeleteProjection actualTable =
+                // Build Delete projection
+                // let updateProjection = fun row -> 
+                //   activeTable.Delete(row.Id)
+                //   ()
+                let row = Expression.Parameter(tableEntityType, "row");
+
+                let deleteBlock: Expression = 
+                    let deleteMethod = rwt.GetMethod("Delete")
+                    let id = Expression.Property(row, "Id")
+                    Expression.Block(Expression.Call(actualTable, deleteMethod, id))
+
+                let deleteLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
+                let deleteProjectionExpresion = Expression.Lambda (deleteLambdaType, deleteBlock, row)
+                deleteProjectionExpresion
+
+            let buildLogicExpression row expression :Expression =
+                match expression with
+                | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
+                | BinaryComparisonOperator (left, op, right) ->
+                    let leftExpression = buildExpression row left
+                    let rightExpression = buildExpression row right
+                    match op with
+                    | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
+                    | "<" -> Expression.LessThan(leftExpression, rightExpression)
+                    | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
+                    | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
+                    | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
+                    | "=" -> Expression.Equal(leftExpression, rightExpression)
+                    | _ -> failwith $"Operator {op} is not implemented"
+                | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
+                | IsNull (expr) -> failwith "Not implemented"
+                | IsNotNull (expr) -> failwith "Not implemented"
+
+            let buildFilterProjection whereExpression =
+                // Build Update projection
+                // let whereProjection = fun row -> 
+                //   row.Quantity <= 100
+                //   ()
+                let row = Expression.Parameter(tableEntityType, "row");
+
+                let updateBlock: Expression = buildLogicExpression row whereExpression
+
+                let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
+                let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+                updateProjectionExpresion
+
+            // Composing things
+            //
+            // let actualTable = ctx.UseTable(ctx.Schema.Books.Table)
+            // tableScan actualTable
+            //     |> Seq.filter whereFilter
+            //     |> Seq.toList
+            //     |> Seq.iter deleteProjection
+            let context = Expression.Parameter(contextType, "context")
+            let schemaAccess = Expression.Property(context, "Schema")
+            let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
+            let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
+            let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
+            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
+            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+            let actualTable = Expression.Variable(rwt, "actualTable");
+            let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
+
+            let deleteProjectionExpresion = buildDeleteProjection actualTable
+            let tableScanExpresion = buildTableScan rwt tableEntityType keyType
+
+            // Create table scan
+            let tableScanResultType = typeof<seq<_>>.GetGenericTypeDefinition().MakeGenericType(typeof<obj voption>.GetGenericTypeDefinition().MakeGenericType(tableEntityType))
+            let tableScan = Expression.Variable(typeof<System.Func<_, _>>.GetGenericTypeDefinition().MakeGenericType(rwt, tableScanResultType), "tableScan");
+            let tableScanAssignment = Expression.Assign(tableScan, tableScanExpresion)
+            let createTableScanExpression = Expression.Invoke(tableScan, actualTable)
+
+            let filteredResult : Expression =
+                match whereClause with
+                | Some(WhereCondition(whereExpression)) -> 
+                    let condition = buildFilterProjection whereExpression
+                    let seqFilter = Expr.methodof <@ filter @>
+                    let filterExpression = Expression.Call(seqFilter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), condition, createTableScanExpression)
+                    filterExpression
+                | _ -> createTableScanExpression
+
+            // Apply update to each object
+            let seqIter = Expr.methodof <@ iterMaterialize @>
+            let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), deleteProjectionExpresion, filteredResult)
             let letFunction = Expression.Block([| actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultExpression)
             let resultLambdaType = typeof<System.Action<ReadWriteTsContext<'TSchema>>>
             let writeTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
