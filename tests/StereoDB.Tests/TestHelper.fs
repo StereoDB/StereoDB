@@ -12,6 +12,16 @@ type Book = {
 with
     interface IEntity<int> with
         member this.Id = this.Id        
+
+type MutableBook = {
+    Id: int
+    Title: string
+    ISBN: string
+    mutable Quantity: int
+}
+with
+    interface IEntity<int> with
+        member this.Id = this.Id
         
 type Order = {
     Id: Guid
@@ -24,6 +34,7 @@ with
 
 type Schema() =
     let _books = {| Table = StereoDbEngine.CreateTable<int, Book>() |}
+    let _mutableBooks = {| Table = StereoDbEngine.CreateTable<int, MutableBook>() |}
     
     let _ordersTable = StereoDbEngine.CreateTable<Guid, Order>()
     let _orders = {|
@@ -33,6 +44,7 @@ type Schema() =
     |}
     
     member this.Books = _books
+    member this.MutableBooks = _mutableBooks
     member this.Orders = _orders
 
 type Db() =    
@@ -42,5 +54,8 @@ type Db() =
         member this.ReadTransaction(transaction) = _engine.ReadTransaction transaction
         member this.WriteTransaction(transaction) = _engine.WriteTransaction transaction
         member this.WriteTransaction<'T>(transaction) = _engine.WriteTransaction<'T>(transaction)
+        member this.ExecuteSql(sql) = _engine.ExecuteSql(sql)
+        member this.ExecuteSql<'T>(sql) = _engine.ExecuteSql<'T>(sql)
         
     static member Create() = Db() :> IStereoDb<Schema>
+

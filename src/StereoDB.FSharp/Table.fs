@@ -93,3 +93,13 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
             | _ -> ()
             
             _data.Remove id
+
+type ReadOnlyTsContext<'TSchema>(schema: 'TSchema) =    
+    member this.Schema = schema
+    member inline this.UseTable(table: ITable<'TId, 'TEntity>) =
+        table :?> IReadOnlyTable<'TId, 'TEntity>
+
+type ReadWriteTsContext<'TSchema>(schema: 'TSchema) =
+    member this.Schema = schema        
+    member inline this.UseTable(table: ITable<'TId, 'TEntity>) =
+        table :?> IReadWriteTable<'TId, 'TEntity>
