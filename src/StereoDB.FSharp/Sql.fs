@@ -41,6 +41,7 @@ module internal SqlParser =
 
     type SelectListItem =
         | AliasedExpression of SqlExpression * string option
+        | Star of string
     type SelectClause = SelectListItem list
     type SetListItem = string * SqlExpression
     type SetClause = SetListItem list
@@ -90,7 +91,8 @@ module internal SqlParser =
     logicOpp.AddOperator(PrefixOperator("NOT", ws, 3, false, fun x -> UnaryLogicalOperator("NOT", x)))
 
     let ALIASED_EXPRESSION = SQL_EXPRESSION .>>. opt (strCI_ws "AS" >>. identifier) |>> AliasedExpression
-    let SELECT_LIST = sepBy ALIASED_EXPRESSION (str_ws ",")
+    let SELECT_LIST_ITEM = ALIASED_EXPRESSION <|> (str_ws "*" |>> Star)
+    let SELECT_LIST = sepBy SELECT_LIST_ITEM (str_ws ",")
     let ASSIGNMENT_EXPRESSION = identifier_ws .>> str_ws "=" .>>. arithExpr |>> SetListItem
     let SET_LIST = strCI_ws "SET" >>. sepBy ASSIGNMENT_EXPRESSION (str_ws ",") //|>> SetClause
     let TABLE_RESULTSET = identifier |>> TableResultset
@@ -332,13 +334,16 @@ module internal QueryBuilder =
                     let namedSelect = 
                         sel |> List.map (fun x ->
                             match x with
-                            | AliasedExpression (expr, Some(alias)) -> (alias, expr)
+                            | AliasedExpression (expr, Some(alias)) -> [(alias, expr)]
                             | AliasedExpression (expr, None) ->
                                 match expr with
                                 | Primitive prim -> match prim with
-                                                    | SqlIdentifier ident -> (ident, expr)
+                                                    | SqlIdentifier ident -> [(ident, expr)]
                                                     | _ -> failwith "Column name cannot be determined"
-                                | _ -> failwith "Column name cannot be determined")
+                                | _ -> failwith "Column name cannot be determined"
+                            | Star(_) -> 
+                                tableEntityType.GetProperties() |> Array.map(fun p -> (p.Name, Primitive(SqlIdentifier(p.Name)))) |> Array.toList)
+                            |> List.concat
 
                     let selectProjectionType = typeof<'TResult>
                     let updateBlock: Expression = 
