@@ -21,38 +21,43 @@ module internal SqlParser =
     let identifier_ws = identifier .>> ws
 
     type SqlPrimitiveExpression = 
-        | SqlIntConstant of int64
+        | SqlIntConstant   of int64
         | SqlFloatConstant of float
-        | SqlIdentifier of string
+        | SqlIdentifier    of string
+        
     type SqlExpression = 
         | BinaryArithmeticOperator of SqlExpression * string * SqlExpression
-        | UnaryArithmeticOperator of string * SqlExpression
-        | Primitive of SqlPrimitiveExpression
+        | UnaryArithmeticOperator  of string * SqlExpression
+        | Primitive                of SqlPrimitiveExpression
 
     type SqlLogicalExpression =
-        | BinaryLogicalOperator of SqlLogicalExpression * string * SqlLogicalExpression
+        | BinaryLogicalOperator    of SqlLogicalExpression * string * SqlLogicalExpression
         | BinaryComparisonOperator of SqlExpression * string * SqlExpression
-        | UnaryLogicalOperator of string * SqlLogicalExpression
-        | IsNull of SqlExpression
-        | IsNotNull of SqlExpression
+        | UnaryLogicalOperator     of string * SqlLogicalExpression
+        | IsNull                   of SqlExpression
+        | IsNotNull                of SqlExpression
 
     type Resultset = 
         | TableResultset of string
 
     type SelectListItem =
         | AliasedExpression of SqlExpression * string option
+        | Star              of string
+        
     type SelectClause = SelectListItem list
     type SetListItem = string * SqlExpression
     type SetClause = SetListItem list
+    
     type FromClause = 
         | Resultset of Resultset
+    
     type WhereClause = 
         | WhereCondition of SqlLogicalExpression
 
     type Query =
-    | SelectQuery of (SelectClause * (FromClause * WhereClause option) option)
-    | UpdateQuery of (string * SetClause * WhereClause option)
-    | DeleteQuery of (string * WhereClause option)
+        | SelectQuery of (SelectClause * (FromClause * WhereClause option) option)
+        | UpdateQuery of (string * SetClause * WhereClause option)
+        | DeleteQuery of (string * WhereClause option)
 
     let SQL_INT_CONSTANT = int_ws |>> SqlIntConstant
     let SQL_FLOAT_CONSTANT = float_ws |>> SqlFloatConstant
@@ -89,13 +94,15 @@ module internal SqlParser =
     logicOpp.AddOperator(InfixOperator("OR", ws, 1, Associativity.Left, fun x y -> BinaryLogicalOperator(x, "OR", y)))
     logicOpp.AddOperator(PrefixOperator("NOT", ws, 3, false, fun x -> UnaryLogicalOperator("NOT", x)))
 
-    let ALIASED_EXPRESSION = SQL_EXPRESSION .>>. opt (strCI_ws "AS" >>. identifier) |>> AliasedExpression
-    let SELECT_LIST = sepBy ALIASED_EXPRESSION (str_ws ",")
+    let ALIASED_EXPRESSION    = SQL_EXPRESSION .>>. opt (strCI_ws "AS" >>. identifier) |>> AliasedExpression
+    let SELECT_LIST_ITEM      = ALIASED_EXPRESSION <|> (str_ws "*" |>> Star)
+    let SELECT_LIST           = sepBy SELECT_LIST_ITEM (str_ws ",")
     let ASSIGNMENT_EXPRESSION = identifier_ws .>> str_ws "=" .>>. arithExpr |>> SetListItem
-    let SET_LIST = strCI_ws "SET" >>. sepBy ASSIGNMENT_EXPRESSION (str_ws ",") //|>> SetClause
-    let TABLE_RESULTSET = identifier |>> TableResultset
-    let FROM_CLAUSE = strCI_ws "FROM" >>. TABLE_RESULTSET |>> Resultset
-    let WHERE_CLAUSE = strCI_ws "WHERE" >>. SQL_LOGICAL_EXPRESSION |>> WhereCondition
+    let SET_LIST              = strCI_ws "SET" >>. sepBy ASSIGNMENT_EXPRESSION (str_ws ",") //|>> SetClause
+    let TABLE_RESULTSET       = identifier |>> TableResultset
+    let FROM_CLAUSE           = strCI_ws "FROM" >>. TABLE_RESULTSET |>> Resultset
+    let WHERE_CLAUSE          = strCI_ws "WHERE" >>. SQL_LOGICAL_EXPRESSION |>> WhereCondition
+    
     let SELECT_STATEMENT = 
         spaces .>> strCI_ws "SELECT" >>. SELECT_LIST .>>. 
             (opt (FROM_CLAUSE .>>. (opt WHERE_CLAUSE))) |>> SelectQuery
@@ -196,6 +203,7 @@ module internal QueryBuilder =
 
     type SchemaMetadata(schema) =
         let schemaType = schema.GetType()
+        
         member this.TryGetTable tableName = 
             let schemaProperty = schemaType.GetProperty(tableName)
             if schemaProperty <> null then
@@ -203,6 +211,7 @@ module internal QueryBuilder =
                 let keyType = tableEntityType.GetInterfaces() |> Seq.find (fun ifType -> ifType.Name = "IEntity`1")
                 Some (schemaProperty, tableEntityType, keyType.GenericTypeArguments[0])
             else None
+        
         member this.TryGetTableColumn tableName columnName = 
             this.TryGetTable tableName
                 |> Option.bind (fun (tableProperty, entityType, keyType) -> 
@@ -332,13 +341,16 @@ module internal QueryBuilder =
                     let namedSelect = 
                         sel |> List.map (fun x ->
                             match x with
-                            | AliasedExpression (expr, Some(alias)) -> (alias, expr)
+                            | AliasedExpression (expr, Some(alias)) -> [(alias, expr)]
                             | AliasedExpression (expr, None) ->
                                 match expr with
                                 | Primitive prim -> match prim with
-                                                    | SqlIdentifier ident -> (ident, expr)
+                                                    | SqlIdentifier ident -> [(ident, expr)]
                                                     | _ -> failwith "Column name cannot be determined"
-                                | _ -> failwith "Column name cannot be determined")
+                                | _ -> failwith "Column name cannot be determined"
+                            | Star(_) -> 
+                                tableEntityType.GetProperties() |> Array.map(fun p -> (p.Name, Primitive(SqlIdentifier(p.Name)))) |> Array.toList)
+                            |> List.concat
 
                     let selectProjectionType = typeof<'TResult>
                     let updateBlock: Expression = 
