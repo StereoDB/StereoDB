@@ -54,8 +54,13 @@ module internal SqlParser =
     type WhereClause = 
         | WhereCondition of SqlLogicalExpression
 
+    type OrderDirection = Ascending | Descending
+    
+    type OrderByClause = 
+        | SortOrder   of (SqlExpression * OrderDirection option) list
+
     type Query =
-        | SelectQuery of (SelectClause * (FromClause * WhereClause option) option)
+        | SelectQuery of (SelectClause * (FromClause * WhereClause option * OrderByClause option) option)
         | UpdateQuery of (string * SetClause * WhereClause option)
         | DeleteQuery of (string * WhereClause option)
 
@@ -102,10 +107,14 @@ module internal SqlParser =
     let TABLE_RESULTSET       = identifier |>> TableResultset
     let FROM_CLAUSE           = strCI_ws "FROM" >>. TABLE_RESULTSET |>> Resultset
     let WHERE_CLAUSE          = strCI_ws "WHERE" >>. SQL_LOGICAL_EXPRESSION |>> WhereCondition
+
+    let SORT_DIRECTION        = (stringCIReturn "ASC" Ascending) <|> (stringCIReturn "DESC" Descending) .>> ws
+    let SORT_EXPRESSION       = SQL_EXPRESSION .>>. opt SORT_DIRECTION
+    let ORDER_BY_CLAUSE       = strCI_ws "ORDER" >>. strCI_ws "BY" >>. sepBy SORT_EXPRESSION (str_ws ",") |>> SortOrder
     
     let SELECT_STATEMENT = 
         spaces .>> strCI_ws "SELECT" >>. SELECT_LIST .>>. 
-            (opt (FROM_CLAUSE .>>. (opt WHERE_CLAUSE))) |>> SelectQuery
+            (opt (FROM_CLAUSE .>>. (opt WHERE_CLAUSE) .>>. (opt ORDER_BY_CLAUSE) |>> flatten)) |>> SelectQuery
 
     let UPDATE_STATEMENT =
         spaces .>> strCI_ws "UPDATE" >>. identifier_ws .>>. SET_LIST .>>. 
@@ -244,6 +253,9 @@ module internal QueryBuilder =
             | ValueSome x -> action.Invoke(x)
             | _ -> false) seq
 
+    let sortWith (comparer: System.Comparison<'T>) (seq: 'T voption seq) =
+        Seq.sortWith (fun x y -> match(x,y) with | ValueSome(x), ValueSome(y) -> comparer.Invoke(x,y) | _ -> 0) seq    
+
     let buildTableScan tableType tableEntityType keyType =
         let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
@@ -264,6 +276,17 @@ module internal QueryBuilder =
         let result = Expression.Call(selectMethod.MakeGenericMethod(keyType, getMethod.ReturnType), getIdsCall, getIdLambda)
         let tableScanExpresion = Expression.Lambda (result, entity)
         tableScanExpresion
+
+    let rec getExpressionType (tableEntityType: System.Type) expr =
+        match expr with
+        | Primitive primitive ->
+            match primitive with
+            | SqlIdentifier ident -> tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
+            | SqlFloatConstant _ -> typeof<float>
+            | SqlIntConstant _ -> typeof<int>
+        | UnaryArithmeticOperator (op, expr) -> getExpressionType tableEntityType expr
+        | BinaryArithmeticOperator (left, op, right) -> getExpressionType tableEntityType left
+            
 
     let buildQuery<'TSchema, 'TResult> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
@@ -289,7 +312,7 @@ module internal QueryBuilder =
             let schemaAccess = Expression.Property(context, "Schema")
 
             match body with
-            | Some (fromClause, whereClause) ->
+            | Some (fromClause, whereClause, orderClause) ->
                 let tableName =
                     match fromClause with
                     | Resultset(TableResultset(tableName)) -> tableName
@@ -384,6 +407,52 @@ module internal QueryBuilder =
                     let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
                     updateProjectionExpresion
 
+                let buildSortFunction (sortExpressions: (SqlExpression * OrderDirection option) list) =
+                    // Build Sort function
+                    // let sortFunction = fun (a, b) -> 
+                    //   let mutable result;
+                    //   result = a.Quantity.CompareTo(b.Quantity)
+                    //   if result <> 0 then result
+                    //   else
+                    //       result = a.Title.CompareTo(b.Title)
+                    //       if result <> 0 then result
+                    //       else 0
+                    let a = Expression.Parameter(tableEntityType, "a");
+                    let b = Expression.Parameter(tableEntityType, "b");
+
+                    let result = Expression.Variable(typeof<int>, "result")
+                    let initResult: Expression = Expression.Assign(result, Expression.Constant(0))
+                    let exitTarget = Expression.Label()
+                    let buildSingleComparison ((expr:SqlExpression), (dir: OrderDirection option)) =
+                        let compableType = (typeof<System.IComparable<_>>).GetGenericTypeDefinition().MakeGenericType(getExpressionType tableEntityType expr)
+                        let compareToMethod = compableType.GetMethod("CompareTo")
+                        let aExpression = buildExpression a expr
+                        let bExpression = buildExpression b expr                        
+                        let comparisonValue = Expression.Call(aExpression, compareToMethod, bExpression)
+                        let comparisonWithDir: Expression =
+                            match dir with
+                            | Some(Descending) -> Expression.Negate(comparisonValue)
+                            | _ -> comparisonValue
+                        let assignComparison: Expression = Expression.Assign(result, comparisonWithDir)
+                        let compare = Expression.IfThen(
+                            Expression.NotEqual(result, Expression.Constant(0)),
+                            Expression.Return(exitTarget)
+                        )
+                        [assignComparison; compare]
+                    let comparison = sortExpressions |> List.collect buildSingleComparison
+                    let body = seq {
+                        initResult
+                        yield! comparison
+                        Expression.Label(exitTarget)
+                        result
+                    }
+
+                    let sortBlock: Expression = Expression.Block([| result |], body)
+
+                    let comparisonLambdaType = (typeof<System.Comparison<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
+                    let sortFunctionExpresion = Expression.Lambda (comparisonLambdaType, sortBlock, a, b)
+                    sortFunctionExpresion
+
                 let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
                 let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
                 let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
@@ -415,9 +484,18 @@ module internal QueryBuilder =
                         filterExpression
                     | _ -> createTableScanExpression
 
+                let sorderResult : Expression =
+                    match orderClause with
+                    | Some(SortOrder(sortExpressions)) ->
+                        let sortFunction = buildSortFunction sortExpressions
+                        let seqSort = Expr.methodof <@ sortWith @>
+                        let orderedExpression = Expression.Call(seqSort.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), sortFunction, filteredResult)
+                        orderedExpression
+                    | _ -> filteredResult
+
                 // Apply select to each object
                 let seqIter = Expr.methodof <@ map @>
-                let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, filteredResult)
+                let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, sorderResult)
                 let addRangeCall = Expression.Call(result, resultsetType.GetMethod("AddRange"), resultExpression);
                 let letFunction = Expression.Block([| result; actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultAssignment, addRangeCall, result)
                 let resultLambdaType = typeof<System.Func<ReadOnlyTsContext<'TSchema>, obj>>
