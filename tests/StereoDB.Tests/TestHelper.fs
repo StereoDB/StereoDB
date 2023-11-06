@@ -56,6 +56,8 @@ type Db() =
         member this.WriteTransaction<'T>(transaction) = _engine.WriteTransaction<'T>(transaction)
         member this.ExecuteSql(sql) = _engine.ExecuteSql(sql)
         member this.ExecuteSql<'T>(sql) = _engine.ExecuteSql<'T>(sql)
+        member this.ExecuteSql((ctx, sql)) = _engine.ExecuteSql(ctx, sql)
+        member this.ExecuteSql<'T>((ctx, sql)) = _engine.ExecuteSql<'T>(ctx, sql)
         
     static member Create() = Db() :> IStereoDb<Schema>
 
