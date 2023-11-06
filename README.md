@@ -10,6 +10,7 @@ Ultrafast and lightweight in-process memory database written in F# that supports
 
 Supported features:
 - [x] C# and F# API
+- [x] Basic SQL support
 - [x] Transactions (read-only, read-write)
 - [x] Secondary Indexes
   - [x] Value Index (hash-based index)
