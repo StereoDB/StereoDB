@@ -4,9 +4,9 @@ open Xunit
 open Tests.TestHelper
 open StereoDB.FSharp
 
-let sqlCompilationFailure (db: IStereoDb<Schema>) sql expectedError = 
+let sqlCompilationFailure (db: IStereoDb<Schema>) (sql: string) expectedError = 
     try
-        db.ExecuteSql sql
+        db.ExecuteSql (sql)
         Assert.True(false, "Should not happens")
     with ex ->
         Assert.Equal (expectedError, ex.Message)

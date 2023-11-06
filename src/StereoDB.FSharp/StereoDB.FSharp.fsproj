@@ -21,6 +21,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="SqlParser.fs" />
         <Compile Include="Table.fs" />
         <Compile Include="Sql.fs" />
         <Compile Include="StereoDb.fs" />
