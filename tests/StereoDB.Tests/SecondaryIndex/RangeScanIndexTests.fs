@@ -1,7 +1,6 @@
 ﻿module Tests.RangeScanIndexTests
 
 open System
-open Maybe.SkipList
 open Swensen.Unquote
 open FsToolkit.ErrorHandling
 open Xunit
@@ -9,11 +8,10 @@ open Xunit
 open StereoDB
 open StereoDB.FSharp
 open Tests.TestHelper
-open StereoDB.Infra.SkipList
 
 [<Fact>]
 let ``RangeScanIndex SelectRange should work correctly`` () =    
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -43,9 +41,8 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
     )
     
 [<Fact>]
-let ``RangeScanIndex remove from index should work correctly`` () =
-    
-    let db = Db.Create()
+let ``RangeScanIndex remove from index should work correctly`` () =    
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -97,9 +94,8 @@ let ``RangeScanIndex remove from index should work correctly`` () =
     )
     
 [<Fact>]
-let ``RangeScanIndex should support reindex`` () =
-    
-    let db = Db.Create()
+let ``RangeScanIndex should support reindex`` () =    
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)

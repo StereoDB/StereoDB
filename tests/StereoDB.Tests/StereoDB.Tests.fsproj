@@ -39,7 +39,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\StereoDB.FSharp\StereoDB.FSharp.fsproj" />
+      <ProjectReference Include="..\..\src\StereoDB\StereoDB.fsproj" />
     </ItemGroup>
 
 </Project>

@@ -1,6 +1,7 @@
 ﻿namespace StereoDB.Sql
 
 open System.Linq.Expressions
+open StereoDB
 open StereoDB.FSharp
 
 module Expr = 

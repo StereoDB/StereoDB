@@ -33,10 +33,10 @@ with
         member this.Id = this.Id
 
 type Schema() =
-    let _books = {| Table = StereoDbEngine.CreateTable<int, Book>() |}
-    let _mutableBooks = {| Table = StereoDbEngine.CreateTable<int, MutableBook>() |}
+    let _books = {| Table = StereoDb.createTable<int, Book>() |}
+    let _mutableBooks = {| Table = StereoDb.createTable<int, MutableBook>() |}
     
-    let _ordersTable = StereoDbEngine.CreateTable<Guid, Order>()
+    let _ordersTable = StereoDb.createTable<Guid, Order>()
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
@@ -46,18 +46,4 @@ type Schema() =
     member this.Books = _books
     member this.MutableBooks = _mutableBooks
     member this.Orders = _orders
-
-type Db() =    
-    let _engine = StereoDbEngine(Schema())
-    
-    interface IStereoDb<Schema> with
-        member this.ReadTransaction(transaction) = _engine.ReadTransaction transaction
-        member this.WriteTransaction(transaction) = _engine.WriteTransaction transaction
-        member this.WriteTransaction<'T>(transaction) = _engine.WriteTransaction<'T>(transaction)
-        member this.ExecuteSql(sql) = _engine.ExecuteSql(sql)
-        member this.ExecuteSql<'T>(sql) = _engine.ExecuteSql<'T>(sql)
-        member this.ExecuteSql((ctx, sql)) = _engine.ExecuteSql(ctx, sql)
-        member this.ExecuteSql<'T>((ctx, sql)) = _engine.ExecuteSql<'T>(ctx, sql)
-        
-    static member Create() = Db() :> IStereoDb<Schema>
 

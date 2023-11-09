@@ -1,12 +1,11 @@
-﻿module internal StereoDB.SecondaryIndex.RangeScanIndex
+﻿namespace StereoDB.SecondaryIndex
 
 open System
 open System.Runtime.CompilerServices
 open StereoDB
 open StereoDB.Infra.SkipList
-open StereoDB.SecondaryIndex.ValueIndex
 
-type RangeScanIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality and 'TValue :> IComparable<'TValue>> 
+type internal RangeScanIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality and 'TValue :> IComparable<'TValue>> 
     (getValue: 'TEntity -> 'TValue) =
     
     let _skipList = SkipList<'TValue>()

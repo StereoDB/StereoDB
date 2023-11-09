@@ -11,7 +11,7 @@ open Tests.TestHelper
 
 [<Fact>]
 let ``Get and Set operations should work correctly`` () =
-    let db = Db.Create()   
+    let db = StereoDb.create(Schema())   
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -62,7 +62,7 @@ let ``Get and Set operations should work correctly`` () =
     
 [<Fact>]
 let ``GetIds should be supported`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     // add books
     db.WriteTransaction(fun ctx ->
