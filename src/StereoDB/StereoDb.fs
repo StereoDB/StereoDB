@@ -78,7 +78,7 @@ type internal StereoDb<'TSchema>(schema: 'TSchema) =
 
         member this.ExecuteSql<'TResult>(sql: string): ResizeArray<'TResult> voption =
             let query = SqlParser.parseSql sql
-            let func = QueryBuilder.buildQuery<'TSchema, unit> query _rCtx schema
+            let func = QueryBuilder.buildQuery<'TSchema, 'TResult> query _rCtx schema
             readQueryExecution _rCtx func               
 
 namespace StereoDB.CSharp
