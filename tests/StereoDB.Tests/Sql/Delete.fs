@@ -2,13 +2,14 @@
 
 open System.Linq
 open FsToolkit.ErrorHandling
+open StereoDB.FSharp
 open Swensen.Unquote
 open Tests.TestHelper
 open Xunit
 
 [<Fact>]
 let ``Delete all rows in table`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
 
     // add books
     db.WriteTransaction(fun ctx ->
@@ -36,7 +37,7 @@ let ``Delete all rows in table`` () =
 
 [<Fact>]
 let ``Delete rows from table by condition`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
 
     // add books
     db.WriteTransaction(fun ctx ->

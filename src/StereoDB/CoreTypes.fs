@@ -24,3 +24,11 @@ type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IC
 type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
+    
+type ReadOnlyTsContext<'TSchema> = {
+    Schema: 'TSchema
+}
+        
+type ReadWriteTsContext<'TSchema> = {
+    Schema: 'TSchema
+}

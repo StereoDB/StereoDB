@@ -10,7 +10,7 @@ class UsersSchema
 
     public UsersSchema()
     {
-        var table = StereoDbEngine.CreateTable<Guid, User>();
+        var table = StereoDb.CreateTable<Guid, User>();
         //var emailIndex = table.AddValueIndex(x => x.Email);
 
         Table = table;
@@ -23,20 +23,20 @@ class Schema
     public UsersSchema Users { get; init; } = new();
 }
 
-class Db : IStereoDb<Schema>
-{
-    private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
-
-    public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => _engine.ReadTransaction(transaction);
-    public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => _engine.WriteTransaction(transaction);
-    public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) => _engine.WriteTransaction(transaction);
-}
+// class Db : IStereoDb<Schema>
+// {
+//     private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
+//
+//     public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => _engine.ReadTransaction(transaction);
+//     public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => _engine.WriteTransaction(transaction);
+//     public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) => _engine.WriteTransaction(transaction);
+// }
 
 [MemoryDiagnoser]
 public class StereoDbBenchmark
 {
     private List<User> _allData;
-    private Db _db = new();
+    private IStereoDb<Schema> _db = StereoDb.Create(new Schema());
     private Random _random = new();
 
     private Int64 CurrentDbWriteCount1 = 0;

@@ -42,10 +42,10 @@ public class Schema
     {
         Books = new BooksSchema
         {
-            Table = StereoDbEngine.CreateTable<int, Book>()
+            Table = StereoDb.CreateTable<int, Book>()
         };
 
-        var ordersTable = StereoDbEngine.CreateTable<Guid, Order>();
+        var ordersTable = StereoDb.CreateTable<Guid, Order>();
 
         Orders = new OrdersSchema
         {
@@ -57,16 +57,16 @@ public class Schema
 }
 
 // defines a DB that implements IStereoDb<Schema>
-public class Db : IStereoDb<Schema>
-{
-    private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
-
-    public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => 
-        _engine.ReadTransaction(transaction);
-    
-    public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => 
-        _engine.WriteTransaction(transaction);
-
-    public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) =>
-        _engine.WriteTransaction(transaction);
-}
+// public class Db : IStereoDb<Schema>
+// {
+//     private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
+//
+//     public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => 
+//         _engine.ReadTransaction(transaction);
+//     
+//     public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => 
+//         _engine.WriteTransaction(transaction);
+//
+//     public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) =>
+//         _engine.WriteTransaction(transaction);
+// }

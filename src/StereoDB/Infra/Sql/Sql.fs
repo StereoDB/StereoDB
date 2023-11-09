@@ -1,6 +1,7 @@
 ﻿namespace StereoDB.Sql
 
 open System.Linq.Expressions
+open StereoDB
 open StereoDB.FSharp
 
 module Expr = 
@@ -326,8 +327,9 @@ module internal QueryBuilder =
                 let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
                 let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
                 let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
-                let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
-                let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+                let useTable = Expr.methodof <@ ReadOnlyTsContextExt.UseTable @>
+                let useTableMethod = useTable.GetGenericMethodDefinition().MakeGenericMethod(schemaType, keyType, tableEntityType)
+                let tableAccessor = Expression.Call(useTableMethod, context, tableExpression)
                 let rot = typeof<IReadOnlyTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
                 let actualTable = Expression.Variable(rot, "actualTable");
                 let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
@@ -479,8 +481,9 @@ module internal QueryBuilder =
             let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
             let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
             let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
-            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
-            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+            let useTable = Expr.methodof <@ ReadWriteTsContextExt.UseTable<_,_,_> @>
+            let useTableMethod = useTable.GetGenericMethodDefinition().MakeGenericMethod(schemaType, keyType, tableEntityType)
+            let tableAccessor = Expression.Call(useTableMethod, context, tableExpression)
             let actualTable = Expression.Variable(rwt, "actualTable");
             let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
 
@@ -593,8 +596,9 @@ module internal QueryBuilder =
             let tablePropertyAccess = Expression.Property(schemaAccess, schemaType.GetProperty(tableName))
             let tet = schemaType.GetProperty(tableName).PropertyType.GetProperty("Table")
             let tableExpression: Expression = Expression.Property(tablePropertyAccess, tet)
-            let useTableMethod = contextType.GetMethod("UseTable").MakeGenericMethod(keyType, tableEntityType)
-            let tableAccessor = Expression.Call(context, useTableMethod, tableExpression)
+            let useTable = Expr.methodof <@ ReadWriteTsContextExt.UseTable<_,_,_> @>
+            let useTableMethod = useTable.GetGenericMethodDefinition().MakeGenericMethod(schemaType, keyType, tableEntityType)
+            let tableAccessor = Expression.Call(useTableMethod, context, tableExpression)
             let actualTable = Expression.Variable(rwt, "actualTable");
             let actualTableAssignment = Expression.Assign(actualTable, tableAccessor)
 

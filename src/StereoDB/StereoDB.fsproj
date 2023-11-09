@@ -22,21 +22,26 @@
 
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="CoreTypes.fs" />        
+        <Compile Include="Contracts\CSharp.fs" />
+        <Compile Include="Contracts\FSharp.fs" />
         <Compile Include="Infra\SkipList.fs" />
-        <Compile Include="CoreTypes.fs" />
+        <Compile Include="Infra\Sql\SqlParser.fs" />
+        <Compile Include="Infra\Sql\Sql.fs" />
         <Compile Include="SecondaryIndex\ValueIndex.fs" />
         <Compile Include="SecondaryIndex\RangeScanIndex.fs" />
-        <Compile Include="CSharp\Table.fs" />
-        <Compile Include="CSharp\StereoDb.fs" />        
+        <Compile Include="StereoDbTable.fs" />
+        <Compile Include="StereoDb.fs" />
     </ItemGroup>    
     
     <ItemGroup>
         <None Include="../../LICENSE" Pack="true" Visible="false" PackagePath="" />
-        <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />        
+        <None Include="../../assets/stereo_db_icon.jpg" Pack="true" Visible="false" PackagePath="" />
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Update="FSharp.Core" Version="7.0.300" />
+        <PackageReference Include="FParsec" Version="2.0.0-beta2" />
     </ItemGroup>
 
 </Project>

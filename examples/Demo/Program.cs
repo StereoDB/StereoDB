@@ -1,6 +1,7 @@
 ﻿using Demo;
+using StereoDB.CSharp;
 
-var db = new Db();
+var db = StereoDb.Create(new Schema());
 
 // 1) adds book
 // WriteTransaction: it's a read-write transaction: we can query and mutate data

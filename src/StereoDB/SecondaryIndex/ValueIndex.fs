@@ -1,11 +1,11 @@
-﻿module internal StereoDB.SecondaryIndex.ValueIndex
+﻿namespace StereoDB.SecondaryIndex
 
 open System
 open System.Collections.Generic
 open System.Runtime.CompilerServices
 open StereoDB
     
-type ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
+type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
     (getValue: 'TEntity -> 'TValue) =
     
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    

@@ -10,8 +10,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Find should work correctly`` () =
-    let db = Db.Create()
+let ``Find should work correctly`` () =    
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -42,8 +42,8 @@ let ``Find should work correctly`` () =
     |> ignore
     
 [<Fact>]
-let ``ValueIndex should handle deletion`` () =
-    let db = Db.Create()
+let ``ValueIndex should handle deletion`` () =    
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -72,8 +72,8 @@ let ``ValueIndex should handle deletion`` () =
     )
     
 [<Fact>]
-let ``ValueIndex should handle reindexing`` () =
-    let db = Db.Create()
+let ``ValueIndex should handle reindexing`` () =    
+    let db = StereoDb.create(Schema())
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)

@@ -86,10 +86,10 @@ public class Schema
     {
         Books = new BooksSchema
         {
-            Table = StereoDbEngine.CreateTable<int, Book>()
+            Table = StereoDb.CreateTable<int, Book>()
         };
 
-        var ordersTable = StereoDbEngine.CreateTable<Guid, Order>();
+        var ordersTable = StereoDb.CreateTable<Guid, Order>();
 
         Orders = new OrdersSchema()
         {
@@ -99,26 +99,11 @@ public class Schema
     }
 }
 
-// defines a DB that implements IStereoDb<Schema>
-public class Db : IStereoDb<Schema>
-{
-    private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
-
-    public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => 
-        _engine.ReadTransaction(transaction);
-    
-    public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => 
-        _engine.WriteTransaction(transaction);
-
-    public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) =>
-        _engine.WriteTransaction(transaction);
-}
-
 public static class Demo
 {
     public static void Run()
     {
-        var db = new Db();
+        var db = StereoDb.Create(new Schema());
 
         // 1) adds book
         // WriteTransaction: it's a read-write transaction: we can query and mutate data
@@ -211,9 +196,9 @@ with
 // defines a DB schema that includes Orders and Books tables
 // and a secondary index: 'BookIdIndex' for the Orders table
 type Schema() =
-    let _books = {| Table = StereoDbEngine.CreateTable<int, Book>() |}
+    let _books = {| Table = StereoDb.createTable<int, Book>() |}
     
-    let _ordersTable = StereoDbEngine.CreateTable<Guid, Order>()
+    let _ordersTable = StereoDb.createTable<Guid, Order>()
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
@@ -222,19 +207,8 @@ type Schema() =
     member this.Books = _books
     member this.Orders = _orders
 
-// defines a DB that implements IStereoDb<Schema>
-type Db() =    
-    let _engine = StereoDbEngine(Schema())
-    
-    interface IStereoDb<Schema> with
-        member this.ReadTransaction(transaction) = _engine.ReadTransaction transaction
-        member this.WriteTransaction(transaction) = _engine.WriteTransaction transaction
-        member this.WriteTransaction<'T>(transaction) = _engine.WriteTransaction<'T>(transaction)
-        
-    static member Create() = Db() :> IStereoDb<Schema>
-
 let test () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
 
     // 1) adds book
     // WriteTransaction: it's a read-write transaction: we can query and mutate data

@@ -1,13 +1,14 @@
 ﻿module Tests.Sql.Update
 
 open FsToolkit.ErrorHandling
+open StereoDB.FSharp
 open Swensen.Unquote
 open Tests.TestHelper
 open Xunit
 
 [<Fact>]
 let ``Update using other field`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -38,7 +39,7 @@ let ``Update using other field`` () =
 
 [<Fact>]
 let ``Update with WHERE`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -69,7 +70,7 @@ let ``Update with WHERE`` () =
 
 [<Fact>]
 let ``Update using other field for mutable record`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -100,7 +101,7 @@ let ``Update using other field for mutable record`` () =
 
 [<Fact>]
 let ``Update all rows in table`` () =
-    let db = Db.Create()
+    let db = StereoDb.create(Schema())
     
     // add books
     db.WriteTransaction(fun ctx ->
