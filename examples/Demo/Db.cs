@@ -55,18 +55,3 @@ public class Schema
         };
     }
 }
-
-// defines a DB that implements IStereoDb<Schema>
-// public class Db : IStereoDb<Schema>
-// {
-//     private readonly StereoDbEngine<Schema> _engine = StereoDbEngine.Create(new Schema());
-//
-//     public T ReadTransaction<T>(Func<ReadOnlyTsContext<Schema>, T> transaction) => 
-//         _engine.ReadTransaction(transaction);
-//     
-//     public T WriteTransaction<T>(Func<ReadWriteTsContext<Schema>, T> transaction) => 
-//         _engine.WriteTransaction(transaction);
-//
-//     public void WriteTransaction(Action<ReadWriteTsContext<Schema>> transaction) =>
-//         _engine.WriteTransaction(transaction);
-// }

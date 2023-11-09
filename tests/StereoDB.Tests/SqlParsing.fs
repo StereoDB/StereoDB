@@ -6,7 +6,7 @@ open StereoDB.FSharp
 
 let sqlCompilationFailure (db: IStereoDb<Schema>) (sql: string) expectedError = 
     try
-        db.ExecuteSql (sql)
+        db.ExecSql (sql)
         Assert.True(false, "Should not happens")
     with ex ->
         Assert.Equal (expectedError, ex.Message)

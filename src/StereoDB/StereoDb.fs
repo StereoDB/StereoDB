@@ -71,12 +71,12 @@ type internal StereoDb<'TSchema>(schema: 'TSchema) =
             finally
                 _lockSlim.ExitWriteLock()
 
-        member this.ExecuteSql(sql) =
+        member this.ExecSql(sql) =
             let query = SqlParser.parseSql sql
             let func = QueryBuilder.buildQuery<'TSchema, unit> query _rwCtx schema
             writeQueryExecution _rwCtx func
 
-        member this.ExecuteSql<'TResult>(sql: string): ResizeArray<'TResult> voption =
+        member this.ExecSql<'TResult>(sql: string): ResizeArray<'TResult> voption =
             let query = SqlParser.parseSql sql
             let func = QueryBuilder.buildQuery<'TSchema, 'TResult> query _rCtx schema
             readQueryExecution _rCtx func               

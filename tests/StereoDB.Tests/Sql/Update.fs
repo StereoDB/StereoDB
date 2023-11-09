@@ -19,7 +19,7 @@ let ``Update using other field`` () =
             books.Set book
     )
 
-    db.ExecuteSql "UPDATE Books SET Quantity = Id"
+    db.ExecSql "UPDATE Books SET Quantity = Id"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
@@ -50,7 +50,7 @@ let ``Update with WHERE`` () =
             books.Set book
     )
 
-    db.ExecuteSql "UPDATE Books SET Quantity = 222 WHERE Id = 8"
+    db.ExecSql "UPDATE Books SET Quantity = 222 WHERE Id = 8"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
@@ -81,7 +81,7 @@ let ``Update using other field for mutable record`` () =
             books.Set book
     )
 
-    db.ExecuteSql "UPDATE MutableBooks SET Quantity = Id"
+    db.ExecSql "UPDATE MutableBooks SET Quantity = Id"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.MutableBooks.Table)
@@ -112,7 +112,7 @@ let ``Update all rows in table`` () =
             books.Set book
     )
 
-    db.ExecuteSql "UPDATE Books SET Quantity = 2"
+    db.ExecSql "UPDATE Books SET Quantity = 2"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)

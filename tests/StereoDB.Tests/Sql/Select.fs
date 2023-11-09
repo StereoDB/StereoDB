@@ -24,7 +24,7 @@ let ``Select all rows`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books"
+    let result = db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
@@ -46,7 +46,7 @@ let ``Select filtered rows`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id <= 3"
+    let result = db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id <= 3"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 3 @>
@@ -55,19 +55,19 @@ let ``Select filtered rows`` () =
     let book2 = result.Value[1]
     test <@ book2.Id = 2 @>
 
-    let booksCount2 = (db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id >= 3").Value.Count
+    let booksCount2 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id >= 3").Value.Count
     test <@ booksCount2 = 8 @>
 
-    let booksCount3 = (db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id = 3").Value.Count
+    let booksCount3 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id = 3").Value.Count
     test <@ booksCount3 = 1 @>
 
-    let booksCount4 = (db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id <> 3").Value.Count
+    let booksCount4 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id <> 3").Value.Count
     test <@ booksCount4 = 9 @>
 
-    let booksCount5 = (db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id < 3").Value.Count
+    let booksCount5 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id < 3").Value.Count
     test <@ booksCount5 = 2 @>
 
-    let booksCount6 = (db.ExecuteSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id > 3").Value.Count
+    let booksCount6 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id > 3").Value.Count
     test <@ booksCount6 = 7 @>
 
 [<Fact>]
@@ -83,7 +83,7 @@ let ``Select star`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<Book> "SELECT * FROM Books"
+    let result = db.ExecSql<Book> "SELECT * FROM Books"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
@@ -105,7 +105,7 @@ let ``Select star into sub-type`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<SubBook> "SELECT * FROM Books"
+    let result = db.ExecSql<SubBook> "SELECT * FROM Books"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
@@ -152,7 +152,7 @@ let ``Order by`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<Book> "SELECT * FROM Books ORDER BY Quantity, Title"
+    let result = db.ExecSql<Book> "SELECT * FROM Books ORDER BY Quantity, Title"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
@@ -179,7 +179,7 @@ let ``Order by ASC`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<Book> "SELECT * FROM Books ORDER BY Quantity ASC, Title"
+    let result = db.ExecSql<Book> "SELECT * FROM Books ORDER BY Quantity ASC, Title"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
@@ -206,7 +206,7 @@ let ``Order by DESC`` () =
             books.Set book
     )
 
-    let result = db.ExecuteSql<Book> "SELECT * FROM Books ORDER BY Quantity DESC, Title"
+    let result = db.ExecSql<Book> "SELECT * FROM Books ORDER BY Quantity DESC, Title"
     
     let booksCount = result.Value.Count
     test <@ booksCount = 10 @>
