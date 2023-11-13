@@ -99,6 +99,13 @@ module internal QueryBuilder =
                         if columnProperty <> null then
                             Some columnProperty
                         else None)
+        
+        member this.GetTableColumn tableName columnName = 
+            let column = 
+                match this.TryGetTableColumn tableName columnName with
+                | Some c -> c
+                | None -> failwith $"Column {columnName} does not exist in table {tableName}"
+            column
 
     let iter<'T> (action: System.Action<'T>) (seq: 'T voption seq) =
         Seq.iter (fun x ->
@@ -148,16 +155,66 @@ module internal QueryBuilder =
         let tableScanExpresion = Expression.Lambda (result, entity)
         tableScanExpresion
 
-    let rec getExpressionType (tableEntityType: System.Type) expr =
-        match expr with
-        | Primitive primitive ->
-            match primitive with
-            | SqlIdentifier ident -> tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
-            | SqlFloatConstant _ -> typeof<float>
-            | SqlIntConstant _ -> typeof<int>
-        | UnaryArithmeticOperator (op, expr) -> getExpressionType tableEntityType expr
-        | BinaryArithmeticOperator (left, op, right) -> getExpressionType tableEntityType left
-            
+    let normalizeSortExpressions expressions = 
+        expressions |> List.map (fun (expr, dir) -> (expr, dir |> Option.defaultValue Ascending))
+
+    type ExpressionBuilder(tableName:string, metadata:SchemaMetadata) = class
+        let (table, tableEntityType, keyType) = 
+            match metadata.TryGetTable tableName with
+            | Some t -> t
+            | None -> failwith $"Table {tableName} is not defined"
+
+        member this.getExpressionType expr =
+            match expr with
+            | Primitive primitive ->
+                match primitive with
+                | SqlIdentifier ident -> tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
+                | SqlFloatConstant _ -> typeof<float>
+                | SqlIntConstant _ -> typeof<int>
+            | UnaryArithmeticOperator (op, expr) -> this.getExpressionType expr
+            | BinaryArithmeticOperator (left, op, right) -> this.getExpressionType left
+
+        member this.buildExpression row expression :Expression =
+            match expression with
+            | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
+            | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
+            | Primitive primitive ->
+                match primitive with
+                | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
+                | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
+                | SqlIdentifier identifier -> Expression.Property(row, metadata.GetTableColumn tableName identifier)
+
+        member this.buildLogicExpression row expression :Expression =
+            match expression with
+            | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
+            | BinaryComparisonOperator (left, op, right) ->
+                let leftExpression = this.buildExpression row left
+                let rightExpression = this.buildExpression row right
+                match op with
+                | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
+                | "<" -> Expression.LessThan(leftExpression, rightExpression)
+                | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
+                | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
+                | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
+                | "=" -> Expression.Equal(leftExpression, rightExpression)
+                | _ -> failwith $"Operator {op} is not implemented"
+            | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
+            | IsNull (expr) -> failwith "Not implemented"
+            | IsNotNull (expr) -> failwith "Not implemented"
+
+        member this.buildFilterProjection tableEntityType whereExpression =
+            // Build Update projection
+            // let whereProjection = fun row -> 
+            //   row.Quantity <= 100
+            //   ()
+            let row = Expression.Parameter(tableEntityType, "row");
+
+            let updateBlock: Expression = this.buildLogicExpression row whereExpression
+
+            let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
+            let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
+            updateProjectionExpresion
+        end         
 
     let buildQuery<'TSchema, 'TResult> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
@@ -187,44 +244,11 @@ module internal QueryBuilder =
                 let tableName =
                     match fromClause with
                     | Resultset(TableResultset(tableName)) -> tableName
+                let expressionBuilder = ExpressionBuilder(tableName, metadata)
                 let (table, tableEntityType, keyType) = 
                     match metadata.TryGetTable tableName with
                     | Some t -> t
                     | None -> failwith $"Table {tableName} is not defined"
-                let findColumn column = 
-                    let column = 
-                        match metadata.TryGetTableColumn tableName column with
-                        | Some c -> c
-                        | None -> failwith $"Column {column} does not exist in table {tableName}"
-                    column
-
-                let buildExpression row expression :Expression =
-                    match expression with
-                    | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
-                    | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
-                    | Primitive primitive ->
-                        match primitive with
-                        | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
-                        | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                        | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
-
-                let buildLogicExpression row expression :Expression =
-                    match expression with
-                    | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
-                    | BinaryComparisonOperator (left, op, right) ->
-                        let leftExpression = buildExpression row left
-                        let rightExpression = buildExpression row right
-                        match op with
-                        | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
-                        | "<" -> Expression.LessThan(leftExpression, rightExpression)
-                        | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
-                        | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
-                        | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
-                        | "=" -> Expression.Equal(leftExpression, rightExpression)
-                        | _ -> failwith $"Operator {op} is not implemented"
-                    | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
-                    | IsNull (expr) -> failwith "Not implemented"
-                    | IsNotNull (expr) -> failwith "Not implemented"
 
                 let buildSelectProjection () =
                     // Build Update projection
@@ -253,7 +277,7 @@ module internal QueryBuilder =
                                 let shouldBeUpdated = namedSelect |> Seq.tryFind (fun (alias, expr) -> alias = prop.Name)
                                 match shouldBeUpdated with
                                 | Some (column, expression) -> 
-                                    let newValueExpression = buildExpression row expression
+                                    let newValueExpression = expressionBuilder.buildExpression row expression
                                     newValueExpression
                                 | None -> Expression.Property(row, prop)
                                 )
@@ -265,20 +289,7 @@ module internal QueryBuilder =
                     let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
                     updateProjectionExpresion
 
-                let buildFilterProjection whereExpression =
-                    // Build Update projection
-                    // let whereProjection = fun row -> 
-                    //   row.Quantity <= 100
-                    //   ()
-                    let row = Expression.Parameter(tableEntityType, "row");
-
-                    let updateBlock: Expression = buildLogicExpression row whereExpression
-
-                    let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
-                    let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
-                    updateProjectionExpresion
-
-                let buildSortFunction (sortExpressions: (SqlExpression * OrderDirection option) list) =
+                let buildSortFunction (sortExpressions: (SqlExpression * OrderDirection) list) =
                     // Build Sort function
                     // let sortFunction = fun (a, b) -> 
                     //   let mutable result;
@@ -294,16 +305,16 @@ module internal QueryBuilder =
                     let result = Expression.Variable(typeof<int>, "result")
                     let initResult: Expression = Expression.Assign(result, Expression.Constant(0))
                     let exitTarget = Expression.Label()
-                    let buildSingleComparison ((expr:SqlExpression), (dir: OrderDirection option)) =
-                        let compableType = (typeof<System.IComparable<_>>).GetGenericTypeDefinition().MakeGenericType(getExpressionType tableEntityType expr)
+                    let buildSingleComparison ((expr:SqlExpression), (dir: OrderDirection)) =
+                        let compableType = (typeof<System.IComparable<_>>).GetGenericTypeDefinition().MakeGenericType(expressionBuilder.getExpressionType expr)
                         let compareToMethod = compableType.GetMethod("CompareTo")
-                        let aExpression = buildExpression a expr
-                        let bExpression = buildExpression b expr                        
+                        let aExpression = expressionBuilder.buildExpression a expr
+                        let bExpression = expressionBuilder.buildExpression b expr                        
                         let comparisonValue = Expression.Call(aExpression, compareToMethod, bExpression)
                         let comparisonWithDir: Expression =
                             match dir with
-                            | Some(Descending) -> Expression.Negate(comparisonValue)
-                            | _ -> comparisonValue
+                            | Descending -> Expression.Negate(comparisonValue)
+                            | Ascending -> comparisonValue
                         let assignComparison: Expression = Expression.Assign(result, comparisonWithDir)
                         let compare = Expression.IfThen(
                             Expression.NotEqual(result, Expression.Constant(0)),
@@ -350,7 +361,7 @@ module internal QueryBuilder =
                 let filteredResult : Expression =
                     match whereClause with
                     | Some(WhereCondition(whereExpression)) -> 
-                        let condition = buildFilterProjection whereExpression
+                        let condition = expressionBuilder.buildFilterProjection tableEntityType whereExpression
                         let seqFilter = Expr.methodof <@ filter @>
                         let filterExpression = Expression.Call(seqFilter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), condition, createTableScanExpression)
                         filterExpression
@@ -359,6 +370,7 @@ module internal QueryBuilder =
                 let sorderResult : Expression =
                     match orderClause with
                     | Some(SortOrder(sortExpressions)) ->
+                        let sortExpressions = normalizeSortExpressions sortExpressions
                         let sortFunction = buildSortFunction sortExpressions
                         let seqSort = Expr.methodof <@ sortWith @>
                         let orderedExpression = Expression.Call(seqSort.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), sortFunction, filteredResult)
@@ -379,24 +391,9 @@ module internal QueryBuilder =
                 match metadata.TryGetTable tableName with
                 | Some t -> t
                 | None -> failwith $"Table {tableName} is not defined"
-            let findColumn column = 
-                let column = 
-                    match metadata.TryGetTableColumn tableName column with
-                    | Some c -> c
-                    | None -> failwith $"Column {column} does not exist in table {tableName}"
-                column
+            let expressionBuilder = ExpressionBuilder(tableName, metadata)
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
-
-            let buildExpression row expression :Expression =
-                match expression with
-                | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
-                | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
-                | Primitive primitive ->
-                    match primitive with
-                    | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
-                    | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                    | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
 
             let buildUpdateProjection actualTable =
                 // Build Update projection
@@ -409,13 +406,13 @@ module internal QueryBuilder =
                 //   ()
                 let row = Expression.Parameter(tableEntityType, "row");
 
-                let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (findColumn column).CanWrite)
+                let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (metadata.GetTableColumn tableName column).CanWrite)
                 let updateBlock: Expression = 
                     if allPropertiesWriteable then
                         // directly update property
                         let setExpressions = set |> List.map (fun (column, expression) -> 
-                            let newValueExpression = buildExpression row expression
-                            let targetProperty = findColumn column
+                            let newValueExpression = expressionBuilder.buildExpression row expression
+                            let targetProperty = metadata.GetTableColumn tableName column
                             let columnExpression = Expression.Property(row, targetProperty)
                             let assignment = Expression.Assign(columnExpression, newValueExpression)
                             assignment :> Expression)
@@ -427,7 +424,7 @@ module internal QueryBuilder =
                                 let shouldBeUpdated = set |> Seq.tryFind (fun (c, e) -> c = prop.Name)
                                 match shouldBeUpdated with
                                 | Some (column, expression) -> 
-                                    let newValueExpression = buildExpression row expression
+                                    let newValueExpression = expressionBuilder.buildExpression row expression
                                     newValueExpression
                                 | None -> Expression.Property(row, prop)
                                 )
@@ -436,37 +433,6 @@ module internal QueryBuilder =
                         Expression.Call(actualTable, setMethod, createNew)
 
                 let updateLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
-                let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
-                updateProjectionExpresion
-
-            let buildLogicExpression row expression :Expression =
-                match expression with
-                | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
-                | BinaryComparisonOperator (left, op, right) ->
-                    let leftExpression = buildExpression row left
-                    let rightExpression = buildExpression row right
-                    match op with
-                    | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
-                    | "<" -> Expression.LessThan(leftExpression, rightExpression)
-                    | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
-                    | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
-                    | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
-                    | "=" -> Expression.Equal(leftExpression, rightExpression)
-                    | _ -> failwith $"Operator {op} is not implemented"
-                | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
-                | IsNull (expr) -> failwith "Not implemented"
-                | IsNotNull (expr) -> failwith "Not implemented"
-
-            let buildFilterProjection whereExpression =
-                // Build Update projection
-                // let whereProjection = fun row -> 
-                //   row.Quantity <= 100
-                //   ()
-                let row = Expression.Parameter(tableEntityType, "row");
-
-                let updateBlock: Expression = buildLogicExpression row whereExpression
-
-                let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
                 let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
                 updateProjectionExpresion
 
@@ -499,7 +465,7 @@ module internal QueryBuilder =
             let filteredResult : Expression =
                 match whereClause with
                 | Some(WhereCondition(whereExpression)) -> 
-                    let condition = buildFilterProjection whereExpression
+                    let condition = expressionBuilder.buildFilterProjection tableEntityType whereExpression
                     let seqFilter = Expr.methodof <@ filter @>
                     let filterExpression = Expression.Call(seqFilter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), condition, createTableScanExpression)
                     filterExpression
@@ -518,24 +484,9 @@ module internal QueryBuilder =
                 match metadata.TryGetTable tableName with
                 | Some t -> t
                 | None -> failwith $"Table {tableName} is not defined"
-            let findColumn column = 
-                let column = 
-                    match metadata.TryGetTableColumn tableName column with
-                    | Some c -> c
-                    | None -> failwith $"Column {column} does not exist in table {tableName}"
-                column
+            let expressionBuilder = ExpressionBuilder(tableName, metadata)
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
-
-            let buildExpression row expression :Expression =
-                match expression with
-                | BinaryArithmeticOperator (left, op, right) -> failwith "Not implemented"
-                | UnaryArithmeticOperator (op, expr) -> failwith "Not implemented"
-                | Primitive primitive ->
-                    match primitive with
-                    | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
-                    | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                    | SqlIdentifier identifier -> Expression.Property(row, findColumn identifier)
 
             let buildDeleteProjection actualTable =
                 // Build Delete projection
@@ -552,37 +503,6 @@ module internal QueryBuilder =
                 let deleteLambdaType = (typeof<System.Action<_>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType)
                 let deleteProjectionExpresion = Expression.Lambda (deleteLambdaType, deleteBlock, row)
                 deleteProjectionExpresion
-
-            let buildLogicExpression row expression :Expression =
-                match expression with
-                | BinaryLogicalOperator (left, op, right) -> failwith "Not implemented"
-                | BinaryComparisonOperator (left, op, right) ->
-                    let leftExpression = buildExpression row left
-                    let rightExpression = buildExpression row right
-                    match op with
-                    | "<=" -> Expression.LessThanOrEqual(leftExpression, rightExpression)
-                    | "<" -> Expression.LessThan(leftExpression, rightExpression)
-                    | ">=" -> Expression.GreaterThanOrEqual(leftExpression, rightExpression)
-                    | ">" -> Expression.GreaterThan(leftExpression, rightExpression)
-                    | "<>" -> Expression.NotEqual(leftExpression, rightExpression)
-                    | "=" -> Expression.Equal(leftExpression, rightExpression)
-                    | _ -> failwith $"Operator {op} is not implemented"
-                | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
-                | IsNull (expr) -> failwith "Not implemented"
-                | IsNotNull (expr) -> failwith "Not implemented"
-
-            let buildFilterProjection whereExpression =
-                // Build Update projection
-                // let whereProjection = fun row -> 
-                //   row.Quantity <= 100
-                //   ()
-                let row = Expression.Parameter(tableEntityType, "row");
-
-                let updateBlock: Expression = buildLogicExpression row whereExpression
-
-                let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
-                let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
-                updateProjectionExpresion
 
             // Composing things
             //
@@ -614,7 +534,7 @@ module internal QueryBuilder =
             let filteredResult : Expression =
                 match whereClause with
                 | Some(WhereCondition(whereExpression)) -> 
-                    let condition = buildFilterProjection whereExpression
+                    let condition = expressionBuilder.buildFilterProjection tableEntityType whereExpression
                     let seqFilter = Expr.methodof <@ filter @>
                     let filterExpression = Expression.Call(seqFilter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType), condition, createTableScanExpression)
                     filterExpression
