@@ -9,6 +9,7 @@ module internal SqlParser =
     let strCI_ws s = pstringCI s .>> ws
     let float_ws = pfloat .>> ws
     let int_ws = pint64 .>> ws
+    let int32_ws = pint32 .>> ws
 
     let identifier =
         let isIdentifierFirstChar c = isLetter c || c = '_'
@@ -42,7 +43,7 @@ module internal SqlParser =
         | AliasedExpression of SqlExpression * string option
         | Star              of string
         
-    type SelectClause = SelectListItem list
+    type SelectClause = int32 option * SelectListItem list
     type SetListItem = string * SqlExpression
     type SetClause = SetListItem list
     
@@ -110,8 +111,10 @@ module internal SqlParser =
     let SORT_EXPRESSION       = SQL_EXPRESSION .>>. opt SORT_DIRECTION
     let ORDER_BY_CLAUSE       = strCI_ws "ORDER" >>. strCI_ws "BY" >>. sepBy SORT_EXPRESSION (str_ws ",") |>> SortOrder
     
+    let TOP_DIRECTIVE         = strCI_ws "TOP" >>. int32_ws
+
     let SELECT_STATEMENT = 
-        spaces .>> strCI_ws "SELECT" >>. SELECT_LIST .>>. 
+        spaces .>> strCI_ws "SELECT" >>. (opt TOP_DIRECTIVE) .>>. SELECT_LIST .>>. 
             (opt (FROM_CLAUSE .>>. (opt WHERE_CLAUSE) .>>. (opt ORDER_BY_CLAUSE) |>> flatten)) |>> SelectQuery
 
     let UPDATE_STATEMENT =
