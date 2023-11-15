@@ -220,3 +220,30 @@ let ``Order by DESC`` () =
     test <@ book2.Id = 2 @>
     test <@ book2.Quantity = 4 @>
 
+[<Fact>]
+let ``TOP`` () =
+    let db = StereoDb.create(Schema())
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
+        
+        for i in [1..10] do
+            let book = { Id = i; Title = $"book_{i}"; Quantity = abs(6 - i) }
+            books.Set book
+    )
+
+    let result = db.ExecSql<Book> "SELECT TOP 3 * FROM Books ORDER BY Quantity DESC, Title"
+    
+    let booksCount = result.Value.Count
+    test <@ booksCount = 3 @>
+    let book1 = result.Value[0]
+    test <@ book1.Id = 1 @>
+    test <@ book1.Quantity = 5 @>
+    let book2 = result.Value[1]
+    test <@ book2.Id = 10 @>
+    test <@ book2.Quantity = 4 @>
+    let book2 = result.Value[2]
+    test <@ book2.Id = 2 @>
+    test <@ book2.Quantity = 4 @>
+

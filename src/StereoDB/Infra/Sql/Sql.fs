@@ -86,23 +86,23 @@ module internal QueryBuilder =
         
         member this.TryGetTable tableName = 
             let schemaProperty = schemaType.GetProperty(tableName)
-            if schemaProperty <> null then
+            if not (isNull schemaProperty) then
                 let tableEntityType = schemaProperty.PropertyType.GenericTypeArguments[0].GenericTypeArguments[1]
                 let keyType = tableEntityType.GetInterfaces() |> Seq.find (fun ifType -> ifType.Name = "IEntity`1")
                 Some (schemaProperty, tableEntityType, keyType.GenericTypeArguments[0])
             else None
         
-        member this.TryGetTableColumn tableName columnName = 
+        member this.TryGetTableColumn(tableName, columnName) = 
             this.TryGetTable tableName
                 |> Option.bind (fun (tableProperty, entityType, keyType) -> 
                         let columnProperty = entityType.GetProperty(columnName)
-                        if columnProperty <> null then
+                        if not (isNull columnProperty) then
                             Some columnProperty
                         else None)
         
-        member this.GetTableColumn tableName columnName = 
+        member this.GetTableColumn(tableName, columnName) = 
             let column = 
-                match this.TryGetTableColumn tableName columnName with
+                match this.TryGetTableColumn(tableName, columnName) with
                 | Some c -> c
                 | None -> failwith $"Column {columnName} does not exist in table {tableName}"
             column
@@ -130,6 +130,9 @@ module internal QueryBuilder =
             match x with 
             | ValueSome x -> action.Invoke(x)
             | _ -> false) seq
+
+    let take count (seq: 'T seq) =
+        Seq.take count seq
 
     let sortWith (comparer: System.Comparison<'T>) (seq: 'T voption seq) =
         Seq.sortWith (fun x y -> match(x,y) with | ValueSome(x), ValueSome(y) -> comparer.Invoke(x,y) | _ -> 0) seq    
@@ -164,15 +167,15 @@ module internal QueryBuilder =
             | Some t -> t
             | None -> failwith $"Table {tableName} is not defined"
 
-        member this.getExpressionType expr =
+        member this.GetExpressionType(expr) =
             match expr with
             | Primitive primitive ->
                 match primitive with
                 | SqlIdentifier ident -> tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
                 | SqlFloatConstant _ -> typeof<float>
                 | SqlIntConstant _ -> typeof<int>
-            | UnaryArithmeticOperator (op, expr) -> this.getExpressionType expr
-            | BinaryArithmeticOperator (left, op, right) -> this.getExpressionType left
+            | UnaryArithmeticOperator (op, expr) -> this.GetExpressionType(expr)
+            | BinaryArithmeticOperator (left, op, right) -> this.GetExpressionType(left)
 
         member this.buildExpression row expression :Expression =
             match expression with
@@ -182,7 +185,7 @@ module internal QueryBuilder =
                 match primitive with
                 | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
                 | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                | SqlIdentifier identifier -> Expression.Property(row, metadata.GetTableColumn tableName identifier)
+                | SqlIdentifier identifier -> Expression.Property(row, metadata.GetTableColumn(tableName, identifier))
 
         member this.buildLogicExpression row expression :Expression =
             match expression with
@@ -257,7 +260,8 @@ module internal QueryBuilder =
                     //   ()
                     let row = Expression.Parameter(tableEntityType, "row");
                     let namedSelect = 
-                        sel |> List.map (fun x ->
+                        sel |> snd
+                            |> List.map (fun x ->
                             match x with
                             | AliasedExpression (expr, Some(alias)) -> [(alias, expr)]
                             | AliasedExpression (expr, None) ->
@@ -306,7 +310,7 @@ module internal QueryBuilder =
                     let initResult: Expression = Expression.Assign(result, Expression.Constant(0))
                     let exitTarget = Expression.Label()
                     let buildSingleComparison ((expr:SqlExpression), (dir: OrderDirection)) =
-                        let compableType = (typeof<System.IComparable<_>>).GetGenericTypeDefinition().MakeGenericType(expressionBuilder.getExpressionType expr)
+                        let compableType = (typeof<System.IComparable<_>>).GetGenericTypeDefinition().MakeGenericType(expressionBuilder.GetExpressionType(expr))
                         let compareToMethod = compableType.GetMethod("CompareTo")
                         let aExpression = expressionBuilder.buildExpression a expr
                         let bExpression = expressionBuilder.buildExpression b expr                        
@@ -379,7 +383,14 @@ module internal QueryBuilder =
 
                 // Apply select to each object
                 let seqIter = Expr.methodof <@ map @>
-                let resultExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, sorderResult)
+                let selectedExpression = Expression.Call(seqIter.GetGenericMethodDefinition().MakeGenericMethod(tableEntityType, typeof<'TResult>), selectProjection, sorderResult)
+
+                let resultExpression = 
+                    match sel |> fst with
+                    | Some top ->
+                        let take = Expr.methodof <@ take @>
+                        Expression.Call(take.GetGenericMethodDefinition().MakeGenericMethod(typeof<'TResult>), Expression.Constant(top), selectedExpression)
+                    | None -> selectedExpression
                 let addRangeCall = Expression.Call(result, resultsetType.GetMethod("AddRange"), resultExpression);
                 let letFunction = Expression.Block([| result; actualTable; tableScan |], actualTableAssignment, tableScanAssignment, resultAssignment, addRangeCall, result)
                 let resultLambdaType = typeof<System.Func<ReadOnlyTsContext<'TSchema>, obj>>
@@ -406,13 +417,13 @@ module internal QueryBuilder =
                 //   ()
                 let row = Expression.Parameter(tableEntityType, "row");
 
-                let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (metadata.GetTableColumn tableName column).CanWrite)
+                let allPropertiesWriteable = set |> List.forall (fun (column,_) -> (metadata.GetTableColumn(tableName, column)).CanWrite)
                 let updateBlock: Expression = 
                     if allPropertiesWriteable then
                         // directly update property
                         let setExpressions = set |> List.map (fun (column, expression) -> 
                             let newValueExpression = expressionBuilder.buildExpression row expression
-                            let targetProperty = metadata.GetTableColumn tableName column
+                            let targetProperty = metadata.GetTableColumn(tableName, column)
                             let columnExpression = Expression.Property(row, targetProperty)
                             let assignment = Expression.Assign(columnExpression, newValueExpression)
                             assignment :> Expression)
