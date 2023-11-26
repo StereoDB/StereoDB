@@ -1,6 +1,8 @@
 ﻿namespace StereoDB.Sql
 
 open FParsec
+open System.Collections.Generic
+open System
 
 module internal SqlParser =
 
@@ -11,18 +13,44 @@ module internal SqlParser =
     let int_ws = pint64 .>> ws
     let int32_ws = pint32 .>> ws
 
+    let private sqlKeywords =
+        [   "AND"; "AS";
+            "DELETE"; "FROM";
+            "INSERT";
+            "INTO"; "IS";
+            "NOT"; "NULL";
+            "OR"; "ORDER";
+            "SELECT"; "SET";
+            "UPDATE"; "WHERE";
+            // Note: we don't include TEMP in this list because it is a schema name.
+        ] |> fun kws ->
+            HashSet<string>(kws, StringComparer.OrdinalIgnoreCase)
+            // Since SQL is case-insensitive, be sure to ignore case
+            // in this hash set.
+
     let identifier =
         let isIdentifierFirstChar c = isLetter c || c = '_'
         let isIdentifierChar c = isLetter c || isDigit c || c = '_'
 
-        many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> ws // skips trailing whitespace
+        many1Satisfy2L isIdentifierFirstChar isIdentifierChar "identifier" .>> ws 
+            // skips trailing whitespace
+             >>=? fun ident ->
+                    if sqlKeywords.Contains(ident.ToString()) then
+                        FParsec.Primitives.fail (sprintf "Cannot use %s as identifier" ident)
+                    else
+                        preturn ident
 
     let identifier_ws = identifier .>> ws
+
+    let unwrap_identifier (part1, part2) =
+        match part2 with
+        | Some part2 -> ((Some part1), part2)
+        | None -> (None, part1)
 
     type SqlPrimitiveExpression = 
         | SqlIntConstant   of int64
         | SqlFloatConstant of float
-        | SqlIdentifier    of string
+        | SqlIdentifier    of string option * string
         
     type SqlExpression = 
         | BinaryArithmeticOperator of SqlExpression * string * SqlExpression
@@ -37,7 +65,7 @@ module internal SqlParser =
         | IsNotNull                of SqlExpression
 
     type Resultset = 
-        | TableResultset of string
+        | TableResultset of string * string option
 
     type SelectListItem =
         | AliasedExpression of SqlExpression * string option
@@ -65,7 +93,7 @@ module internal SqlParser =
 
     let SQL_INT_CONSTANT = int_ws |>> SqlIntConstant
     let SQL_FLOAT_CONSTANT = float_ws |>> SqlFloatConstant
-    let SQL_IDENTIFIER = identifier |>> SqlIdentifier
+    let SQL_IDENTIFIER = identifier .>>. opt (str_ws "." >>. identifier) |>> unwrap_identifier |>> SqlIdentifier
     let SQL_EXPRESSION = SQL_INT_CONSTANT <|> SQL_FLOAT_CONSTANT <|> SQL_IDENTIFIER |>> Primitive
 
     let arithOpp = new OperatorPrecedenceParser<SqlExpression,unit,unit>()
@@ -103,7 +131,7 @@ module internal SqlParser =
     let SELECT_LIST           = sepBy SELECT_LIST_ITEM (str_ws ",")
     let ASSIGNMENT_EXPRESSION = identifier_ws .>> str_ws "=" .>>. arithExpr |>> SetListItem
     let SET_LIST              = strCI_ws "SET" >>. sepBy ASSIGNMENT_EXPRESSION (str_ws ",") //|>> SetClause
-    let TABLE_RESULTSET       = identifier |>> TableResultset
+    let TABLE_RESULTSET       = identifier .>>. opt (opt (str_ws "AS") >>. identifier) |>> TableResultset
     let FROM_CLAUSE           = strCI_ws "FROM" >>. TABLE_RESULTSET |>> Resultset
     let WHERE_CLAUSE          = strCI_ws "WHERE" >>. SQL_LOGICAL_EXPRESSION |>> WhereCondition
 

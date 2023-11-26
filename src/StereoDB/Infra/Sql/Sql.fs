@@ -92,6 +92,11 @@ module internal QueryBuilder =
                 Some (schemaProperty, tableEntityType, keyType.GenericTypeArguments[0])
             else None
         
+        member this.GetTable tableName = 
+            match this.TryGetTable tableName with
+            | Some (schemaProperty, tableEntityType, keyType) -> (schemaProperty, tableEntityType, keyType) 
+            | None -> failwith $"Table {tableName} was not found"
+        
         member this.TryGetTableColumn(tableName, columnName) = 
             this.TryGetTable tableName
                 |> Option.bind (fun (tableProperty, entityType, keyType) -> 
@@ -160,18 +165,37 @@ module internal QueryBuilder =
 
     let normalizeSortExpressions expressions = 
         expressions |> List.map (fun (expr, dir) -> (expr, dir |> Option.defaultValue Ascending))
+        
+    type QueryScope = 
+        {
+            aliases: System.Collections.Generic.Dictionary<string, string>
+        }
 
-    type ExpressionBuilder(tableName:string, metadata:SchemaMetadata) = class
-        let (table, tableEntityType, keyType) = 
-            match metadata.TryGetTable tableName with
-            | Some t -> t
-            | None -> failwith $"Table {tableName} is not defined"
+    let addTableAlias scope alias tableName =
+        scope.aliases.Add(alias, tableName)
+
+    let resolveAlias scope alias =
+        let mutable resolved = Unchecked.defaultof<string>
+        if scope.aliases.TryGetValue(alias, &resolved) then
+            resolved
+        else
+            alias
+
+    type ExpressionBuilder(tableName:string, queryScope: QueryScope, metadata:SchemaMetadata) = class
+        let (table, tableEntityType, keyType) = metadata.GetTable tableName
 
         member this.GetExpressionType(expr) =
             match expr with
             | Primitive primitive ->
                 match primitive with
-                | SqlIdentifier ident -> tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
+                | SqlIdentifier (tableAlias, ident) ->
+                    match tableAlias with
+                    | Some tableAlias ->
+                        let resolvedTableName = resolveAlias queryScope tableAlias
+                        let (_, tableEntityType, _) = metadata.GetTable resolvedTableName
+                        tableEntityType.GetProperty(ident).PropertyType
+                    | None ->
+                        tableEntityType.GetProperty(ident).PropertyType // failwithf "Cannot get type for expression %s" ident
                 | SqlFloatConstant _ -> typeof<float>
                 | SqlIntConstant _ -> typeof<int>
             | UnaryArithmeticOperator (op, expr) -> this.GetExpressionType(expr)
@@ -185,7 +209,13 @@ module internal QueryBuilder =
                 match primitive with
                 | SqlFloatConstant c -> Expression.Constant(c, typeof<float>)
                 | SqlIntConstant c -> if keyType = typeof<int> then Expression.Constant(c |> int, typeof<int>) else Expression.Constant(c, typeof<int64>)
-                | SqlIdentifier identifier -> Expression.Property(row, metadata.GetTableColumn(tableName, identifier))
+                | SqlIdentifier (tableAlias, identifier) ->
+                    match tableAlias with
+                    | Some tableAlias ->
+                        let resolvedTableName = resolveAlias queryScope tableAlias
+                        Expression.Property(row, metadata.GetTableColumn(resolvedTableName, identifier))
+                    | None ->
+                        Expression.Property(row, metadata.GetTableColumn(tableName, identifier))
 
         member this.buildLogicExpression row expression :Expression =
             match expression with
@@ -217,11 +247,12 @@ module internal QueryBuilder =
             let updateLambdaType = (typeof<System.Func<_, _>>).GetGenericTypeDefinition().MakeGenericType(tableEntityType, typeof<bool>)
             let updateProjectionExpresion = Expression.Lambda (updateLambdaType, updateBlock, row)
             updateProjectionExpresion
-        end         
+        end       
 
     let buildQuery<'TSchema, 'TResult> (query: Query) executionContext schema =
         let metadata = SchemaMetadata(schema)
         let schemaType = typeof<'TSchema>
+        let queryScope = { aliases = System.Collections.Generic.Dictionary<string, string>() }
         match query with
         | SelectQuery (sel, body) ->
             let resultsetType = typeof<System.Collections.Generic.List<'TResult>>
@@ -237,6 +268,7 @@ module internal QueryBuilder =
             // let actualTable = ctx.UseTable(ctx.Schema.Books.Table)
             // tableScan actualTable
             //     |> Seq.filter whereFilter
+            //     |> Seq.orderBy orderByFunction
             //     |> Seq.map selectProjection
             let contextType = typeof<ReadOnlyTsContext<'TSchema>>
             let context = Expression.Parameter(contextType, "context")
@@ -246,8 +278,12 @@ module internal QueryBuilder =
             | Some (fromClause, whereClause, orderClause) ->
                 let tableName =
                     match fromClause with
-                    | Resultset(TableResultset(tableName)) -> tableName
-                let expressionBuilder = ExpressionBuilder(tableName, metadata)
+                    | Resultset(TableResultset(tableName, tableAlias)) ->
+                        match tableAlias with
+                        | Some tableAlias -> addTableAlias queryScope tableAlias tableName
+                        | None -> ()
+                        tableName
+                let expressionBuilder = ExpressionBuilder(tableName, queryScope, metadata)
                 let (table, tableEntityType, keyType) = 
                     match metadata.TryGetTable tableName with
                     | Some t -> t
@@ -267,11 +303,11 @@ module internal QueryBuilder =
                             | AliasedExpression (expr, None) ->
                                 match expr with
                                 | Primitive prim -> match prim with
-                                                    | SqlIdentifier ident -> [(ident, expr)]
+                                                    | SqlIdentifier (tableAlias, ident) -> [(ident, expr)]
                                                     | _ -> failwith "Column name cannot be determined"
                                 | _ -> failwith "Column name cannot be determined"
                             | Star(_) -> 
-                                tableEntityType.GetProperties() |> Array.map(fun p -> (p.Name, Primitive(SqlIdentifier(p.Name)))) |> Array.toList)
+                                tableEntityType.GetProperties() |> Array.map(fun p -> (p.Name, Primitive(SqlIdentifier(Some tableName, p.Name)))) |> Array.toList)
                             |> List.concat
 
                     let selectProjectionType = typeof<'TResult>
@@ -402,7 +438,7 @@ module internal QueryBuilder =
                 match metadata.TryGetTable tableName with
                 | Some t -> t
                 | None -> failwith $"Table {tableName} is not defined"
-            let expressionBuilder = ExpressionBuilder(tableName, metadata)
+            let expressionBuilder = ExpressionBuilder(tableName, queryScope, metadata)
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
@@ -495,7 +531,7 @@ module internal QueryBuilder =
                 match metadata.TryGetTable tableName with
                 | Some t -> t
                 | None -> failwith $"Table {tableName} is not defined"
-            let expressionBuilder = ExpressionBuilder(tableName, metadata)
+            let expressionBuilder = ExpressionBuilder(tableName, queryScope, metadata)
             let contextType = typeof<ReadWriteTsContext<'TSchema>>
             let rwt = typeof<IReadWriteTable<_, _>>.GetGenericTypeDefinition().MakeGenericType(keyType, tableEntityType)
 
