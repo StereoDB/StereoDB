@@ -88,8 +88,8 @@ module internal SqlParser =
 
     type Query =
         | SelectQuery of (SelectClause * (FromClause * WhereClause option * OrderByClause option) option)
-        | UpdateQuery of (string * SetClause * WhereClause option)
-        | DeleteQuery of (string * WhereClause option)
+        | UpdateQuery of (string * SetClause * FromClause option * WhereClause option)
+        | DeleteQuery of (string * FromClause option * WhereClause option)
 
     let SQL_INT_CONSTANT = int_ws |>> SqlIntConstant
     let SQL_FLOAT_CONSTANT = float_ws |>> SqlFloatConstant
@@ -110,6 +110,11 @@ module internal SqlParser =
     let flatten v =
         match v with
         | ((a, b), c) -> (a, b, c) 
+     //   | _ -> failwith "Invalid tuple to flatten"
+
+    let flatten4 v =
+        match v with
+        | (((a, b), c), d) -> (a, b, c, d) 
      //   | _ -> failwith "Invalid tuple to flatten"
 
     let logicOpp = new OperatorPrecedenceParser<SqlLogicalExpression,unit,unit>()
@@ -147,11 +152,13 @@ module internal SqlParser =
 
     let UPDATE_STATEMENT =
         spaces .>> strCI_ws "UPDATE" >>. identifier_ws .>>. SET_LIST .>>. 
-        (opt (WHERE_CLAUSE)) |>> flatten |>> UpdateQuery
+        (opt FROM_CLAUSE) .>>.
+        (opt (WHERE_CLAUSE)) |>> flatten4 |>> UpdateQuery
 
     let DELETE_STATEMENT =
-        spaces .>> strCI_ws "DELETE" >>. strCI_ws "FROM" >>. identifier_ws .>>. 
-        (opt (WHERE_CLAUSE)) |>> DeleteQuery
+        spaces .>> strCI_ws "DELETE" >>. opt (strCI_ws "FROM") >>. identifier_ws .>>. 
+        (opt FROM_CLAUSE) .>>.
+        (opt (WHERE_CLAUSE)) |>> flatten |>> DeleteQuery
 
     let QUERY = SELECT_STATEMENT <|> UPDATE_STATEMENT <|> DELETE_STATEMENT
 
