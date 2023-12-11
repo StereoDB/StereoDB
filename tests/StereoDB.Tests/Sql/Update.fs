@@ -37,8 +37,11 @@ let ``Update using other field`` () =
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 3 @>
 
-[<Fact>]
-let ``Update with WHERE`` () =
+[<Theory>]
+[<InlineData("UPDATE Books SET Quantity = 222 WHERE Id = 8")>]
+[<InlineData("UPDATE b SET Quantity = 222 FROM Books b WHERE b.Id = 8")>]
+[<InlineData("UPDATE Books SET Quantity = 222 FROM Books WHERE Id = 8")>]
+let ``Update with WHERE`` (sql) =
     let db = StereoDb.create(Schema())
     
     // add books
@@ -50,7 +53,7 @@ let ``Update with WHERE`` () =
             books.Set book
     )
 
-    db.ExecSql "UPDATE Books SET Quantity = 222 WHERE Id = 8"
+    db.ExecSql sql
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)

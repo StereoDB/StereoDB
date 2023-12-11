@@ -433,7 +433,17 @@ module internal QueryBuilder =
                 let readTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
                 Read (readTransaction.Compile() :?> System.Func<ReadOnlyTsContext<'TSchema>, obj>)
             | None -> failwith "SELECT without FROM not yet supported"
-        | UpdateQuery (tableName, set, whereClause) ->
+        | UpdateQuery (tableNameOrAlias, set, fromClause, whereClause) ->
+            let tableName =
+                match fromClause with
+                | Some (resultset) -> 
+                    match resultset with
+                    | Resultset(TableResultset(tableName, tableAlias)) ->
+                        match tableAlias with
+                        | Some tableAlias -> addTableAlias queryScope tableAlias tableName
+                        | None -> ()
+                        resolveAlias queryScope tableNameOrAlias
+                | None -> tableNameOrAlias
             let (table, tableEntityType, keyType) = 
                 match metadata.TryGetTable tableName with
                 | Some t -> t
@@ -526,7 +536,17 @@ module internal QueryBuilder =
             let writeTransaction = Expression.Lambda (resultLambdaType, letFunction, context)
             
             Write (writeTransaction.Compile() :?> System.Action<ReadWriteTsContext<'TSchema>>)
-        | DeleteQuery (tableName, whereClause) ->
+        | DeleteQuery (tableNameOrAlias, fromClause, whereClause) ->
+            let tableName =
+                match fromClause with
+                | Some (resultset) -> 
+                    match resultset with
+                    | Resultset(TableResultset(tableName, tableAlias)) ->
+                        match tableAlias with
+                        | Some tableAlias -> addTableAlias queryScope tableAlias tableName
+                        | None -> ()
+                        resolveAlias queryScope tableNameOrAlias
+                | None -> tableNameOrAlias
             let (table, tableEntityType, keyType) = 
                 match metadata.TryGetTable tableName with
                 | Some t -> t

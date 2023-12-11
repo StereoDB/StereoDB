@@ -35,8 +35,12 @@ let ``Delete all rows in table`` () =
     let allIdsCount = result.Value
     test <@ allIdsCount = 0 @>
 
-[<Fact>]
-let ``Delete rows from table by condition`` () =
+[<Theory>]
+[<InlineData("DELETE FROM Books WHERE Id = 7")>]
+[<InlineData("DELETE Books WHERE Id = 7")>]
+[<InlineData("DELETE b FROM Books b WHERE Id = 7")>]
+[<InlineData("DELETE Books FROM Books WHERE Id = 7")>]
+let ``Delete rows from table by condition`` (sql) =
     let db = StereoDb.create(Schema())
 
     // add books
@@ -48,7 +52,7 @@ let ``Delete rows from table by condition`` () =
             books.Set book
     )
 
-    db.ExecSql "DELETE FROM Books WHERE Id = 7"
+    db.ExecSql sql
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
