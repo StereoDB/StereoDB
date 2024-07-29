@@ -63,6 +63,7 @@ module internal SqlParser =
         | UnaryLogicalOperator     of string * SqlLogicalExpression
         | IsNull                   of SqlExpression
         | IsNotNull                of SqlExpression
+        | Between                  of SqlExpression * SqlExpression * SqlExpression
 
     type Resultset = 
         | TableResultset of string * string option
@@ -123,6 +124,7 @@ module internal SqlParser =
     let primitiveLogicalExpression =
         (SQL_EXPRESSION .>>? strCI_ws "IS" .>>? strCI_ws "NULL" |>> IsNull)
         <|> (SQL_EXPRESSION .>>? strCI_ws "IS" .>>? strCI_ws "NOT" .>> strCI_ws "NULL" |>> IsNotNull)
+        <|> (SQL_EXPRESSION .>>? strCI_ws "BETWEEN" .>>. SQL_EXPRESSION .>>? strCI_ws "AND" .>>. SQL_EXPRESSION |>> flatten |>> Between)
         <|> (SQL_EXPRESSION .>>.? logicalOperator .>>. SQL_EXPRESSION |>> flatten |>> BinaryComparisonOperator)
     let logicExpressionTerm = (primitiveLogicalExpression) <|> between (str_ws "(") (str_ws ")") SQL_LOGICAL_EXPRESSION
     logicOpp.TermParser <- logicExpressionTerm

@@ -282,3 +282,19 @@ let ``Alias for table`` (sql) =
     let book2 = result.Value[2]
     test <@ book2.SuperId = 7 @>
     test <@ book2.Quantity = 1 @>
+
+[<Fact>]
+let ``Select filtered rows with between`` () =
+    let db = StereoDb.create(Schema())
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
+        
+        for i in [1..10] do
+            let book = { Id = i; Title = $"book_{i}"; Quantity = abs(6 - i) }
+            books.Set book
+    )
+
+    let booksCount = (db.ExecSql<Book> "SELECT * FROM Books WHERE Id BETWEEN 4 AND 6").Value.Count
+    test <@ booksCount = 3 @>
