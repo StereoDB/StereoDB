@@ -238,7 +238,15 @@ module internal QueryBuilder =
             | IsNotNull (expr) ->
                 let expression = this.buildExpression row expr
                 Expression.NotEqual(Expression.Constant(null), expression)
-
+            | Between (expr: SqlExpression, left, right) ->
+                let leftExpression = this.buildExpression row left
+                let rightExpression = this.buildExpression row right
+                let exprToCheck = this.buildExpression row expr
+                Expression.AndAlso(
+                    Expression.GreaterThanOrEqual(exprToCheck, leftExpression),
+                    Expression.LessThanOrEqual(exprToCheck, rightExpression)
+                )
+                
         member this.buildFilterProjection tableEntityType whereExpression =
             // Build Update projection
             // let whereProjection = fun row -> 
@@ -268,7 +276,7 @@ module internal QueryBuilder =
             //     let ids = entity.GetIds()
             //     ids
             //         |> Seq.map (fun id -> entity.Get id)
-               
+            //    
             // let actualTable = ctx.UseTable(ctx.Schema.Books.Table)
             // tableScan actualTable
             //     |> Seq.filter whereFilter
