@@ -232,8 +232,12 @@ module internal QueryBuilder =
                 | "=" -> Expression.Equal(leftExpression, rightExpression)
                 | _ -> failwith $"Operator {op} is not implemented"
             | UnaryLogicalOperator (op, expr) -> failwith "Not implemented"
-            | IsNull (expr) -> failwith "Not implemented"
-            | IsNotNull (expr) -> failwith "Not implemented"
+            | IsNull (expr) -> 
+                let expression = this.buildExpression row expr
+                Expression.Equal(Expression.Constant(null), expression)
+            | IsNotNull (expr) ->
+                let expression = this.buildExpression row expr
+                Expression.NotEqual(Expression.Constant(null), expression)
             | Between (expr: SqlExpression, left, right) ->
                 let leftExpression = this.buildExpression row left
                 let rightExpression = this.buildExpression row right
@@ -243,7 +247,6 @@ module internal QueryBuilder =
                     Expression.LessThanOrEqual(exprToCheck, rightExpression)
                 )
                 
-
         member this.buildFilterProjection tableEntityType whereExpression =
             // Build Update projection
             // let whereProjection = fun row -> 

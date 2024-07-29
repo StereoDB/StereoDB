@@ -17,6 +17,12 @@ type SuperBook =
         Quantity: int
     }
 
+type BookTitle =
+    {
+        Id: int
+        Title: string
+    }
+
 [<Fact>]
 let ``Select all rows`` () =
     let db = StereoDb.create(Schema())
@@ -75,6 +81,62 @@ let ``Select filtered rows`` () =
 
     let booksCount6 = (db.ExecSql<SubBook> "SELECT Id, Quantity FROM Books WHERE Id > 3").Value.Count
     test <@ booksCount6 = 7 @>
+
+[<Fact>]
+let ``WHERE IS NULL`` () =
+    let db = StereoDb.create(Schema())
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.NullableBooks.Table)
+        
+        for i in [1..25] do
+            let book = { 
+                Id = i; 
+                Title = $"book_{i}"; 
+                OptionalValue = if (i % 2 = 0) then Option.None else Option.Some i;
+                NullableValueType = if (i % 3 = 0) then System.Nullable() else System.Nullable i;
+                NullableRefType = if (i % 5 = 0) then null else i.ToString();
+            }
+            books.Set book
+    )
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE NullableRefType IS NULL").Value.Count
+    test <@ booksCount = 5 @>
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE NullableValueType IS NULL").Value.Count
+    test <@ booksCount = 8 @>
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE OptionalValue IS NULL").Value.Count
+    test <@ booksCount = 12 @>
+
+[<Fact>]
+let ``WHERE IS NOT NULL`` () =
+    let db = StereoDb.create(Schema())
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.NullableBooks.Table)
+        
+        for i in [1..25] do
+            let book = { 
+                Id = i; 
+                Title = $"book_{i}"; 
+                OptionalValue = if (i % 2 = 0) then Option.None else Option.Some i;
+                NullableValueType = if (i % 3 = 0) then System.Nullable() else System.Nullable i;
+                NullableRefType = if (i % 5 = 0) then null else i.ToString();
+            }
+            books.Set book
+    )
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE NullableRefType IS NOT NULL").Value.Count
+    test <@ booksCount = 20 @>
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE NullableValueType IS NOT NULL").Value.Count
+    test <@ booksCount = 17 @>
+
+    let booksCount = (db.ExecSql<BookTitle> "SELECT Id, Title FROM NullableBooks WHERE OptionalValue IS NOT NULL").Value.Count
+    test <@ booksCount = 13 @>
 
 [<Fact>]
 let ``Select star`` () =
