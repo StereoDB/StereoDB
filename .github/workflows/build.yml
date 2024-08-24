@@ -17,6 +17,7 @@ jobs:
       uses: actions/setup-dotnet@v2
       with:
         dotnet-version: |
+            6.x.x
             7.x.x
             8.x.x
     - name: Restore dependencies
