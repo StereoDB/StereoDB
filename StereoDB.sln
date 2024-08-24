@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35209.166
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB", "src\StereoDB\StereoDB.fsproj", "{10D31B1A-8FA0-41CF-864F-EDD5BB9D08F7}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB.Tests", "tests\StereoDB.Tests\StereoDB.Tests.fsproj", "{AB7ABE27-8857-4703-B793-EB29D6354FF1}"
@@ -15,6 +18,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Demo", "examples\Demo\Demo.csproj", "{0CE765A3-11A9-44C5-9E54-0BAB0B4D447B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoadTests", "benchmarks\LoadTests\LoadTests.csproj", "{384974AB-D945-48EE-B7ED-11E688DEAA0B}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB.Sql", "src\StereoDB.Sql\StereoDB.Sql.fsproj", "{48E4A4EE-A3C8-47DE-AEB5-0875A61051D5}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB.Sql.Tests", "tests\StereoDB.Sql.Tests\StereoDB.Sql.Tests.fsproj", "{DA358BB7-6F56-472B-A9C8-85861386A7C2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,11 +49,26 @@ Global
 		{384974AB-D945-48EE-B7ED-11E688DEAA0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{384974AB-D945-48EE-B7ED-11E688DEAA0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{384974AB-D945-48EE-B7ED-11E688DEAA0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48E4A4EE-A3C8-47DE-AEB5-0875A61051D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48E4A4EE-A3C8-47DE-AEB5-0875A61051D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48E4A4EE-A3C8-47DE-AEB5-0875A61051D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48E4A4EE-A3C8-47DE-AEB5-0875A61051D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{AB7ABE27-8857-4703-B793-EB29D6354FF1} = {1C2B539B-C9CD-484F-AB8E-D87645C74DF4}
 		{CB0CF20D-FBFC-4B32-9B9A-C73DA67F446D} = {0394F1BC-7633-4A5B-91D9-870BB3D3A842}
 		{0CE765A3-11A9-44C5-9E54-0BAB0B4D447B} = {F950EB26-E2C8-47A0-877C-4A64BCD7C792}
 		{384974AB-D945-48EE-B7ED-11E688DEAA0B} = {0394F1BC-7633-4A5B-91D9-870BB3D3A842}
+		{DA358BB7-6F56-472B-A9C8-85861386A7C2} = {1C2B539B-C9CD-484F-AB8E-D87645C74DF4}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9735FB40-9535-406B-A4EF-D04BBA6879DE}
 	EndGlobalSection
 EndGlobal

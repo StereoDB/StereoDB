@@ -29,7 +29,3 @@ type IStereoDb<'TSchema> =
     abstract ReadTransaction: transaction:(ReadOnlyTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> 'T voption) -> 'T voption
     abstract WriteTransaction: transaction:(ReadWriteTsContext<'TSchema> -> unit) -> unit
-    abstract ExecSql: sql:string -> unit
-    abstract ExecSql: sql:string -> ResizeArray<'TResult> voption
-    // abstract ExecSql: transaction:(ReadOnlyTsContext<'TSchema> * string) -> ResizeArray<'TResult> voption
-    // abstract ExecSql: transaction:(ReadWriteTsContext<'TSchema> * string) -> unit
