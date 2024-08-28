@@ -1,18 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
         <IsPackable>false</IsPackable>
         <GenerateProgramFile>false</GenerateProgramFile>
         <OtherFlags>$(OtherFlags) --test:GraphBasedChecking --test:ParallelOptimization --test:ParallelIlxGen</OtherFlags>
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="TestHelper.fs" />
-        <Compile Include="Sql\Update.fs" />
-        <Compile Include="Sql\Delete.fs" />
-        <Compile Include="Sql\Select.fs" />
-        <Compile Include="SqlParsing.fs" />        
+        <Compile Include="TestHelper.fs" />        
         <Compile Include="SecondaryIndex\RangeScanIndexTests.fs" />
         <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />

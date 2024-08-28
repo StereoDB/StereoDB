@@ -3,7 +3,6 @@
 open System
 open System.Threading
 open StereoDB
-open StereoDB.Sql
 
 type internal StereoDb<'TSchema>(schema: 'TSchema) =
     
@@ -11,20 +10,6 @@ type internal StereoDb<'TSchema>(schema: 'TSchema) =
     
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
-           
-    let readQueryExecution (context: ReadOnlyTsContext<'TSchema>) (func:QueryBuilder.QueryExecution<'TSchema>) =
-        match func with
-        | QueryBuilder.Write _ ->
-            failwith "Execution of UPDATE and DELETE queries from this method is not supported. Please use ExecuteSql<T>(string)"
-        
-        | QueryBuilder.Read caller -> 
-            let value = caller.Invoke context
-            if value = null then ValueNone else ValueSome (value :?> System.Collections.Generic.List<'T>)
-
-    let writeQueryExecution (context: ReadWriteTsContext<'TSchema>) (func:QueryBuilder.QueryExecution<'TSchema>) =
-        match func with
-        | QueryBuilder.Write caller -> caller.Invoke context
-        | QueryBuilder.Read _       -> failwith "Execution of SELECT query from this method is not supported. Please use ExecuteSql<T>(string)"           
            
     interface CSharp.IStereoDb<'TSchema> with           
             
@@ -70,16 +55,6 @@ type internal StereoDb<'TSchema>(schema: 'TSchema) =
                 transaction _rwCtx
             finally
                 _lockSlim.ExitWriteLock()
-
-        member this.ExecSql(sql) =
-            let query = SqlParser.parseSql sql
-            let func = QueryBuilder.buildQuery<'TSchema, unit> query _rwCtx schema
-            writeQueryExecution _rwCtx func
-
-        member this.ExecSql<'TResult>(sql: string): ResizeArray<'TResult> voption =
-            let query = SqlParser.parseSql sql
-            let func = QueryBuilder.buildQuery<'TSchema, 'TResult> query _rCtx schema
-            readQueryExecution _rCtx func               
 
 namespace StereoDB.CSharp
 

@@ -20,7 +20,7 @@ let ``Delete all rows in table`` () =
             books.Set book
     )
 
-    db.ExecSql "DELETE FROM Books"
+    db.ExecuteNonQuery "DELETE FROM Books"
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
@@ -52,7 +52,7 @@ let ``Delete rows from table by condition`` (sql) =
             books.Set book
     )
 
-    db.ExecSql sql
+    db.ExecuteNonQuery sql
 
     let result = db.ReadTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)
