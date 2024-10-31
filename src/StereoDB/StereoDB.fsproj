@@ -6,7 +6,7 @@
         <TargetFramework>netstandard2.1</TargetFramework>
         <Authors>Anton Moldovan</Authors>
         <Company>StereoDB</Company>
-        <Version>0.2.0-beta.0</Version>
+        <Version>0.3.0</Version>
         <Copyright>StereoDB@2024</Copyright>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
