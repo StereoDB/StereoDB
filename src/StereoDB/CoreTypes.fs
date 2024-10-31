@@ -20,15 +20,19 @@ type IValueIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> ICompa
 type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IComparable<'TValue>> =
     inherit IValueIndex<'TValue, 'TEntity>
     abstract SelectRange: fromValue:'TValue * toValue: 'TValue -> 'TEntity seq
+
+type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> = interface end    
     
-type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+type IConfigurationTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+    inherit ITable<'TId, 'TEntity>
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>
+    abstract AddMultiValueIndex: getValues:Func<'TEntity, 'TValue seq> -> IValueIndex<'TValue, 'TEntity>
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
-    
+
 type ReadOnlyTsContext<'TSchema> = {
     Schema: 'TSchema
 }
-        
+
 type ReadWriteTsContext<'TSchema> = {
     Schema: 'TSchema
 }

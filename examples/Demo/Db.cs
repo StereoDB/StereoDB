@@ -9,6 +9,7 @@ public record Book : IEntity<int>
     public int Id { get; init; }
     public string Title { get; init; }
     public int Quantity { get; init; }
+    public int[] Categories { get; init; }
 }
 
 // defines an Order type that implements IEntity<TId>
@@ -22,6 +23,7 @@ public record Order : IEntity<Guid>
 public class BooksSchema
 {
     public ITable<int, Book> Table { get; init; }
+    public IValueIndex<int, Book> CategoryIndex { get; init; }
 }
 
 public class OrdersSchema
@@ -40,9 +42,12 @@ public class Schema
     
     public Schema()
     {
+        var booksTable = StereoDb.CreateTable<int, Book>();
+        
         Books = new BooksSchema
         {
-            Table = StereoDb.CreateTable<int, Book>()
+            Table = booksTable,
+            CategoryIndex = booksTable.AddMultiValueIndex(order => order.Categories)
         };
 
         var ordersTable = StereoDb.CreateTable<Guid, Order>();

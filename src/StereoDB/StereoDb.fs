@@ -66,7 +66,7 @@ namespace StereoDB.CSharp
         
         static member CreateTable() =
             StereoDbTable<'TId, 'TEntity>()
-            :> ITable<_, _>
+            :> IConfigurationTable<_, _>
             
 namespace StereoDB.FSharp
 
@@ -79,4 +79,4 @@ namespace StereoDB.FSharp
         
         let createTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'TId: equality> () =
             StereoDbTable<'TId, 'TEntity>()
-            :> ITable<_, _>                     
+            :> IConfigurationTable<_, _>                     

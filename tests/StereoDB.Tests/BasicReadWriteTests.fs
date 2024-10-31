@@ -31,7 +31,7 @@ let ``Get and Set operations should work correctly`` () =
             voption {
                 let! book = books.Get id
                 if book.Quantity > 0 then
-                    let order = { Id = Guid.NewGuid(); BookId = id; Quantity = 1 }
+                    let order = { Id = id; BookId = id; Quantity = 1; Categories = [||] }
                     let updatedBook = { book with Quantity = book.Quantity - 1 }
                     
                     books.Set updatedBook

@@ -15,14 +15,12 @@ type IReadWriteTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     abstract Set: entity:'TEntity -> unit
     abstract Delete: id:'TId -> bool
 
-[<Extension>]
-type ReadOnlyTsContextExt() =    
+type ReadOnlyTsContextExt =    
     [<Extension>]
     static member inline UseTable(ctx: ReadOnlyTsContext<'TSchema>, table: ITable<'TId, 'TEntity>) =
         table :?> IReadOnlyTable<'TId, 'TEntity>
     
-[<Extension>]
-type ReadWriteTsContextExt() =
+type ReadWriteTsContextExt =
     [<Extension>]
     static member inline UseTable(ctx: ReadWriteTsContext<'TSchema>, table: ITable<'TId, 'TEntity>) =
         table :?> IReadWriteTable<'TId, 'TEntity>

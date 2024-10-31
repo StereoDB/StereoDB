@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net6.0;net8.0</TargetFrameworks>
+        <TargetFramework>net8.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <GenerateProgramFile>false</GenerateProgramFile>
         <OtherFlags>$(OtherFlags) --test:GraphBasedChecking --test:ParallelOptimization --test:ParallelIlxGen</OtherFlags>
@@ -11,6 +11,7 @@
         <Compile Include="TestHelper.fs" />        
         <Compile Include="SecondaryIndex\RangeScanIndexTests.fs" />
         <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
+        <Compile Include="SecondaryIndex\MultiValueIndexTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>

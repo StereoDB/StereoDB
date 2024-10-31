@@ -80,10 +80,27 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                             | _       -> ()
                     }
         }
+        
+    let addMultiValueIndex (getValues: Func<'TEntity, 'TValue seq>) =
+        let index = MultiValueIndex<'TId, 'TEntity, 'TValue>(getValues.Invoke)            
+        _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+        
+        {
+            new IValueIndex<'TValue, 'TEntity> with
+                member this.Find(value) =
+                    let ids = index.FindIds(value)
+                    seq {
+                        for id in ids do
+                            match _data.TryGetValue id with
+                            | true, v -> v
+                            | _       -> ()
+                    }
+        }
     
-    interface ITable<'TId, 'TEntity> with
+    interface IConfigurationTable<'TId, 'TEntity> with
         member this.AddRangeScanIndex(getValue) = addRangeScanIndex getValue            
         member this.AddValueIndex(getValue) = addValueIndex getValue
+        member this.AddMultiValueIndex(getValue) = addMultiValueIndex getValue
         
     interface CSharp.IReadOnlyTable<'TId, 'TEntity> with
         member this.GetIds() = getIds()

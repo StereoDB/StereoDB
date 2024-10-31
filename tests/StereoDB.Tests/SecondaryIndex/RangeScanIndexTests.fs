@@ -16,9 +16,9 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 5 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 3 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
         orders.Set order1
         orders.Set order2
@@ -47,9 +47,9 @@ let ``RangeScanIndex remove from index should work correctly`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 5 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 3 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
         orders.Set order1
         orders.Set order2
@@ -83,7 +83,7 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         test <@ data[1].Quantity = 5 @>
         
         // add new item
-        let order4 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 10 } 
+        let order4 = { Id = 4; BookId = 3; Quantity = 10; Categories = [||] } 
         orders.Set order4
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 11) |> Seq.toArray
         
@@ -100,9 +100,9 @@ let ``RangeScanIndex should support reindex`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 5 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 3 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
         orders.Set order1
         orders.Set order2

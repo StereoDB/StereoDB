@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Title>StereoDB</Title>
         <Description>Ultrafast and lightweight in-process memory database that supports: transactions, secondary indexes, persistence, and data size larger than memory.</Description>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFramework>netstandard2.1</TargetFramework>
         <Authors>Anton Moldovan</Authors>
         <Company>StereoDB</Company>
         <Version>0.2.0-beta.0</Version>
@@ -27,6 +27,7 @@
         <Compile Include="Contracts\FSharp.fs" />
         <Compile Include="Infra\SkipList.fs" />
         <Compile Include="SecondaryIndex\ValueIndex.fs" />
+        <Compile Include="SecondaryIndex\MultiValueIndex.fs" />
         <Compile Include="SecondaryIndex\RangeScanIndex.fs" />
         <Compile Include="StereoDbTable.fs" />
         <Compile Include="StereoDb.fs" />

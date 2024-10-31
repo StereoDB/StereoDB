@@ -16,9 +16,9 @@ let ``Find should work correctly`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 1 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
         orders.Set order1
         orders.Set order2
@@ -48,9 +48,9 @@ let ``ValueIndex should handle deletion`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 1 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
         orders.Set order1
         orders.Set order2
@@ -78,9 +78,9 @@ let ``ValueIndex should handle reindexing`` () =
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
-        let order1 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order2 = { Id = Guid.NewGuid(); BookId = 1; Quantity = 1 }
-        let order3 = { Id = Guid.NewGuid(); BookId = 3; Quantity = 1 }
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
         orders.Set order1
         orders.Set order2
