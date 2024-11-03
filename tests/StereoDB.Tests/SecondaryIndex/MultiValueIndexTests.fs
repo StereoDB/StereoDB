@@ -103,4 +103,36 @@ let ``MultiValueIndex should handle reindexing`` () =
         test <@ category2.Length = 3 @>
         test <@ category3.Length = 0 @>
         test <@ category4.Length = 1 @>
-    )        
+    )
+    
+[<Fact>]
+let ``MultiValueIndex should support reindexing by hash comparison`` () =    
+    let db = StereoDb.create(Schema2())
+    
+    db.WriteTransaction(fun ctx ->
+        let orders = ctx.UseTable(ctx.Schema.Orders.Table)
+                
+        let categories = [| 2 |] |> Set.ofArray                
+        let order1 = { Id = 1; Categories = categories }
+        let order2 = { Id = 2; Categories = categories }
+        let order3 = { Id = 3; Categories = categories }
+      
+        orders.Set order1
+        orders.Set order2
+        orders.Set order3
+        
+        let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
+        let category5 = ctx.Schema.Orders.CategoryIndex.Find(5) |> Seq.toArray
+        
+        test <@ category2.Length = 3 @>
+        test <@ category5.Length = 0 @>
+        
+        let order3 = { order3 with Categories = order3.Categories |> Set.add 5 |> Set.remove 2 } 
+        orders.Set order3
+        
+        let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
+        let category5 = ctx.Schema.Orders.CategoryIndex.Find(5) |> Seq.toArray        
+        
+        test <@ category2.Length = 2 @>
+        test <@ category5.Length = 1 @>        
+    )              

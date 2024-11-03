@@ -1,6 +1,5 @@
 ﻿module Tests.TestHelper
 
-open System
 open StereoDB
 open StereoDB.FSharp
 
@@ -36,4 +35,22 @@ type Schema() =
     
     member this.Books = _books
     member this.Orders = _orders
+    
+type Order2 = {
+    Id: int    
+    Categories: Set<int>
+}
+with
+    interface IEntity<int> with
+        member this.Id = this.Id    
+    
+type Schema2() =    
+    
+    let _ordersTable = StereoDb.createTable<int, Order2>()
+    let _orders = {|
+        Table = _ordersTable        
+        CategoryIndex = _ordersTable.AddMultiValueIndex((fun order -> order.Categories), unsafeReindexByObjRefCompare = true)
+    |}    
+    
+    member this.Orders = _orders    
 

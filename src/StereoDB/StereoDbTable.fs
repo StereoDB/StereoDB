@@ -81,8 +81,8 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                     }
         }
         
-    let addMultiValueIndex (getValues: Func<'TEntity, 'TValue seq>) =
-        let index = MultiValueIndex<'TId, 'TEntity, 'TValue>(getValues.Invoke)            
+    let addMultiValueIndex (getValues: Func<'TEntity, 'TValue seq>) (unsafeReindexByObjRefCompare) =
+        let index = MultiValueIndex<'TId, 'TEntity, 'TValue>(getValues.Invoke, unsafeReindexByObjRefCompare)            
         _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
         
         {
@@ -100,7 +100,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
     interface IConfigurationTable<'TId, 'TEntity> with
         member this.AddRangeScanIndex(getValue) = addRangeScanIndex getValue            
         member this.AddValueIndex(getValue) = addValueIndex getValue
-        member this.AddMultiValueIndex(getValue) = addMultiValueIndex getValue
+        member this.AddMultiValueIndex(getValue, unsafeReindexByObjRefCompare) = addMultiValueIndex getValue unsafeReindexByObjRefCompare 
         
     interface CSharp.IReadOnlyTable<'TId, 'TEntity> with
         member this.GetIds() = getIds()

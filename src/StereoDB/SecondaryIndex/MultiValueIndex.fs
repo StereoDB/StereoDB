@@ -6,7 +6,7 @@ open System.Runtime.CompilerServices
 open StereoDB
     
 type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
-    (getValues: 'TEntity -> 'TValue seq) =
+    (getValues: 'TEntity -> 'TValue seq, unsafeReindexByObjRefCompare: bool) =
     
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
@@ -36,11 +36,18 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and '
         let oldValues = getValues oldEntity
         let newValues = getValues newEntity
         
-        for v in oldValues do
-            removeOldValue oldEntity.Id v
-            
-        for v in newValues do
-            addNewValue oldEntity.Id v
+        let shouldReindex =
+            if unsafeReindexByObjRefCompare then
+                 not (Object.ReferenceEquals(oldValues, newValues))                 
+            else
+                true
+        
+        if shouldReindex then
+            for v in oldValues do
+                removeOldValue oldEntity.Id v
+                
+            for v in newValues do
+                addNewValue oldEntity.Id v
     
     member this.RemoveFromIndex(entity) =
         let values = getValues entity

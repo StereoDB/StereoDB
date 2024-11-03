@@ -1,6 +1,7 @@
 ﻿namespace StereoDB
 
 open System
+open System.Runtime.InteropServices
 
 type IEntity<'TId> =
     abstract Id: 'TId
@@ -25,8 +26,10 @@ type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> = interface end
     
 type IConfigurationTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
     inherit ITable<'TId, 'TEntity>
-    abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>
-    abstract AddMultiValueIndex: getValues:Func<'TEntity, 'TValue seq> -> IValueIndex<'TValue, 'TEntity>
+    abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>    
+    abstract AddMultiValueIndex:
+        getValues:Func<'TEntity, 'TValue seq> *
+        [<Optional; DefaultParameterValue(false:bool)>] unsafeReindexByObjRefCompare:bool -> IValueIndex<'TValue, 'TEntity>        
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
 
 type ReadOnlyTsContext<'TSchema> = {
