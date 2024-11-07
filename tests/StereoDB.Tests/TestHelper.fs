@@ -8,9 +8,6 @@ type Book = {
     Title: string
     Quantity: int
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
         
 type Order = {
     Id: int
@@ -18,14 +15,11 @@ type Order = {
     Quantity: int
     Categories: int[]
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
 
 type Schema() =
-    let _books = {| Table = StereoDb.createTable<int, Book>() |}
+    let _books = {| Table = StereoDb.createTable<int, Book>("books") |}
     
-    let _ordersTable = StereoDb.createTable<int, Order>()
+    let _ordersTable = StereoDb.createTable<int, Order>("orders")
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
@@ -36,21 +30,24 @@ type Schema() =
     member this.Books = _books
     member this.Orders = _orders
     
+    interface IDbSchema with
+        member this.AllTables = [_books.Table; _orders.Table]
+    
 type Order2 = {
     Id: int    
     Categories: Set<int>
-}
-with
-    interface IEntity<int> with
-        member this.Id = this.Id    
+}    
     
 type Schema2() =    
     
-    let _ordersTable = StereoDb.createTable<int, Order2>()
+    let _ordersTable = StereoDb.createTable<int, Order2>("orders")
     let _orders = {|
         Table = _ordersTable        
         CategoryIndex = _ordersTable.AddMultiValueIndex((fun order -> order.Categories), unsafeReindexByObjRefCompare = true)
     |}    
     
-    member this.Orders = _orders    
+    member this.Orders = _orders
+    
+    interface IDbSchema with
+        member this.AllTables = [_ordersTable]
 

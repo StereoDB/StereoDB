@@ -1,7 +1,8 @@
 ﻿using Demo;
+using StereoDB;
 using StereoDB.CSharp;
 
-var db = StereoDb.Create(new Schema());
+var db = StereoDb.Create(new Schema(), StereoDbSettings.Default);
 
 // 1) adds book
 // WriteTransaction: it's a read-write transaction: we can query and mutate data
@@ -12,7 +13,7 @@ db.WriteTransaction(ctx =>
 
     foreach (var id in Enumerable.Range(0, 10))
     {
-        var book = new Book {Id = id, Title = $"book_{id}", Quantity = 1, Categories = [ 1, 2 ]};
+        var book = new Book { Id = id, Title = $"book_{id}", Quantity = 1, Categories = [ 1, 2 ] };
         books.Set(book);
     }
 });

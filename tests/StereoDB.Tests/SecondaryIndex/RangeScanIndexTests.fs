@@ -11,7 +11,7 @@ open Tests.TestHelper
 
 [<Fact>]
 let ``RangeScanIndex SelectRange should work correctly`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -20,9 +20,9 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
         
@@ -42,7 +42,7 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
     
 [<Fact>]
 let ``RangeScanIndex remove from index should work correctly`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -51,9 +51,9 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
         
@@ -75,7 +75,7 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         test <@ data[1].Quantity = 3 @>
         
         // add item again 
-        orders.Set order2
+        orders.Set(order2.Id, order2)
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
         
         test <@ data.Length = 2 @>
@@ -84,7 +84,7 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         
         // add new item
         let order4 = { Id = 4; BookId = 3; Quantity = 10; Categories = [||] } 
-        orders.Set order4
+        orders.Set(order4.Id, order4)
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 11) |> Seq.toArray
         
         test <@ data.Length = 3 @>
@@ -95,7 +95,7 @@ let ``RangeScanIndex remove from index should work correctly`` () =
     
 [<Fact>]
 let ``RangeScanIndex should support reindex`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -104,16 +104,16 @@ let ``RangeScanIndex should support reindex`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
         test <@ data.Length = 2 @>
         
         // change quantity and update item
         let updatedOrder2 = { order2 with Quantity = 100 }
-        orders.Set updatedOrder2
+        orders.Set(updatedOrder2.Id, updatedOrder2)
         
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
         test <@ data.Length = 1 @>

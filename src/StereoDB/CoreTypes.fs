@@ -3,16 +3,13 @@
 open System
 open System.Runtime.InteropServices
 
-type IEntity<'TId> =
-    abstract Id: 'TId
-
 type ISecondaryIndex = interface end
 
-type internal ISecondaryIndex<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+type internal ISecondaryIndex<'TId, 'TEntity> =
     inherit ISecondaryIndex
-    abstract AddToIndex: entity:'TEntity -> unit
-    abstract TryReIndex: oldEntity:'TEntity * newEntity:'TEntity -> unit
-    abstract RemoveFromIndex: entity:'TEntity -> unit
+    abstract AddToIndex: id:'TId * entity:'TEntity -> unit
+    abstract TryReIndex: id:'TId * oldEntity:'TEntity * newEntity:'TEntity -> unit
+    abstract RemoveFromIndex: id:'TId * entity:'TEntity -> unit
 
 type IValueIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IComparable<'TValue>> =
     inherit ISecondaryIndex
@@ -22,15 +19,23 @@ type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IC
     inherit IValueIndex<'TValue, 'TEntity>
     abstract SelectRange: fromValue:'TValue * toValue: 'TValue -> 'TEntity seq
 
-type ITable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> = interface end    
+type ITable =
+    abstract TableName: string
+    abstract TableIndex: int
+
+type ITable<'TId, 'TEntity> =
+    inherit ITable
     
-type IConfigurationTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+type IConfigurationTable<'TId, 'TEntity> =    
     inherit ITable<'TId, 'TEntity>
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>    
     abstract AddMultiValueIndex:
         getValues:Func<'TEntity, 'TValue seq> *
         [<Optional; DefaultParameterValue(false:bool)>] unsafeReindexByObjRefCompare:bool -> IValueIndex<'TValue, 'TEntity>        
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
+
+type IDbSchema =
+    abstract AllTables: ITable seq 
 
 type ReadOnlyTsContext<'TSchema> = {
     Schema: 'TSchema

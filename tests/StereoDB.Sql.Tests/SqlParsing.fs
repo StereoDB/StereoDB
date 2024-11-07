@@ -1,9 +1,9 @@
 ﻿module Tests.SqlParsing
 
+open StereoDB
 open Xunit
 open Tests.TestHelper
 open StereoDB.FSharp
-open StereoDB.Sql
 
 let sqlCompilationFailure (db: IStereoDb<Schema>) (sql: string) expectedError = 
     try
@@ -14,12 +14,12 @@ let sqlCompilationFailure (db: IStereoDb<Schema>) (sql: string) expectedError =
 
 [<Fact>]
 let ``Fails on not existing table`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     sqlCompilationFailure db "UPDATE NonExisting SET Quantity = 2" "Table NonExisting is not defined"
 
 [<Fact>]
 let ``Fails on not existing column`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     sqlCompilationFailure db "UPDATE Books SET NonExisting = 2" "Column NonExisting does not exist in table Books"

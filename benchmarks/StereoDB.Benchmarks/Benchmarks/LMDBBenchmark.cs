@@ -7,7 +7,6 @@ namespace StereoDB.Benchmarks.Benchmarks;
 public class LMDBBenchmark
 {
     private LightningEnvironment ENV;
-    private LightningDatabase DB;
     
     private Random _random = new();
     private List<User> _allData;

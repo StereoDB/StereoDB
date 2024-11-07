@@ -4,13 +4,13 @@ open System
 open System.Collections.Generic
 open System.Runtime.CompilerServices
 open StereoDB
-    
-type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and 'TEntity :> IEntity<'TId> and 'TValue : equality> 
+
+type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality> 
     (getValues: 'TEntity -> 'TValue seq, unsafeReindexByObjRefCompare: bool) =
     
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
-    let addNewValue (id: 'TId) (newValue: 'TValue) =
+    let addNewValue id newValue =
         match _valueIds.TryGetValue newValue with
         | true, ids ->
             ids.Add(id) |> ignore
@@ -20,19 +20,19 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and '
             ids.Add(id) |> ignore
             _valueIds[newValue] <- ids
     
-    let removeOldValue (id: 'TId) (oldValue: 'TValue) =
+    let removeOldValue id oldValue =
         match _valueIds.TryGetValue oldValue with
         | true, ids -> ids.Remove(id) |> ignore
         | _         -> ()
     
-    member this.AddToIndex(entity) =
+    member this.AddToIndex(id, entity) =
         let values = getValues entity
         for v in values do
-            addNewValue entity.Id v
+            addNewValue id v
         
     member inline this.AddToIndex(entityId, value) = addNewValue entityId value
     
-    member this.TryReIndex(oldEntity, newEntity) =
+    member this.TryReIndex(id, oldEntity, newEntity) =
         let oldValues = getValues oldEntity
         let newValues = getValues newEntity
         
@@ -44,15 +44,15 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and '
         
         if shouldReindex then
             for v in oldValues do
-                removeOldValue oldEntity.Id v
+                removeOldValue id v
                 
             for v in newValues do
-                addNewValue oldEntity.Id v
+                addNewValue id v
     
-    member this.RemoveFromIndex(entity) =
+    member this.RemoveFromIndex(id, entity) =
         let values = getValues entity
         for v in values do            
-            removeOldValue entity.Id v
+            removeOldValue id v
     
     member this.FindIds(value): 'TId seq  =
         match _valueIds.TryGetValue value with
@@ -62,10 +62,10 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TId : equality and '
     interface ISecondaryIndex<'TId, 'TEntity> with
     
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-        member this.AddToIndex(entity) = this.AddToIndex(entity)
+        member this.AddToIndex(id, entity) = this.AddToIndex(id, entity)
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-        member this.TryReIndex(oldEntity, newEntity) = this.TryReIndex(oldEntity, newEntity)
+        member this.TryReIndex(id, oldEntity, newEntity) = this.TryReIndex(id, oldEntity, newEntity)
         
         [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-        member this.RemoveFromIndex(entity) = this.RemoveFromIndex(entity)
+        member this.RemoveFromIndex(id, entity) = this.RemoveFromIndex(id, entity)

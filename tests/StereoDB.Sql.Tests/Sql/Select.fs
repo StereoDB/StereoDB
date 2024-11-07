@@ -1,5 +1,6 @@
 ﻿module Tests.Sql.Select
 
+open StereoDB
 open StereoDB.FSharp
 open Xunit
 open Tests.TestHelper
@@ -25,7 +26,7 @@ type BookTitle =
 
 [<Fact>]
 let ``Select all rows`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -47,7 +48,7 @@ let ``Select all rows`` () =
 
 [<Fact>]
 let ``Select filtered rows`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -84,7 +85,7 @@ let ``Select filtered rows`` () =
 
 [<Fact>]
 let ``WHERE IS NULL`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -112,7 +113,7 @@ let ``WHERE IS NULL`` () =
 
 [<Fact>]
 let ``WHERE IS NOT NULL`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -140,7 +141,7 @@ let ``WHERE IS NOT NULL`` () =
 
 [<Fact>]
 let ``Select star`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -162,7 +163,7 @@ let ``Select star`` () =
 
 [<Fact>]
 let ``Select star into sub-type`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -209,7 +210,7 @@ let ``Select star into sub-type`` () =
 
 [<Fact>]
 let ``Order by`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -236,7 +237,7 @@ let ``Order by`` () =
 
 [<Fact>]
 let ``Order by ASC`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -263,7 +264,7 @@ let ``Order by ASC`` () =
 
 [<Fact>]
 let ``Order by DESC`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -290,7 +291,7 @@ let ``Order by DESC`` () =
 
 [<Fact>]
 let ``TOP`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -320,7 +321,7 @@ let ``TOP`` () =
 [<InlineData("SELECT b.Id as SuperId, b.Quantity FROM Books AS b ORDER BY Quantity, Title")>]
 [<InlineData("SELECT b.Id as SuperId, b.Quantity FROM Books b ORDER BY Quantity, Title")>]
 let ``Alias for table`` (sql) =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -347,7 +348,7 @@ let ``Alias for table`` (sql) =
 
 [<Fact>]
 let ``Select filtered rows with between`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->

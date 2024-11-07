@@ -25,6 +25,7 @@
         <Compile Include="CoreTypes.fs" />        
         <Compile Include="Contracts\CSharp.fs" />
         <Compile Include="Contracts\FSharp.fs" />
+        <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
         <Compile Include="SecondaryIndex\ValueIndex.fs" />
         <Compile Include="SecondaryIndex\MultiValueIndex.fs" />
@@ -39,7 +40,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="8.0.401" />
+        <PackageReference Update="FSharp.Core" Version="8.0.401" />        
     </ItemGroup>
 
 </Project>

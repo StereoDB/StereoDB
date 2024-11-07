@@ -16,7 +16,7 @@ public class Order
     public int? LotNumber { get; set; }
 }
 
-public class User : IEntity<Guid>
+public class User
 {
     //public int Id { get; set; }
     public Guid Id { get; set; }

@@ -1,6 +1,5 @@
 module Tests.BasicReadWriteTests
 
-open System
 open Swensen.Unquote
 open FsToolkit.ErrorHandling
 open Xunit
@@ -10,16 +9,16 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Get and Set operations should work correctly`` () =
-    let db = StereoDb.create(Schema())   
+let ``Get and Set operations should work correctly`` () =    
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)   
     
     // add books
     db.WriteTransaction(fun ctx ->
         let books = ctx.UseTable(ctx.Schema.Books.Table)        
         
         for i in [1..10] do
-            let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
-            books.Set book
+            let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }            
+            books.Set(book)
     )
 
     // create order
@@ -34,8 +33,8 @@ let ``Get and Set operations should work correctly`` () =
                     let order = { Id = id; BookId = id; Quantity = 1; Categories = [||] }
                     let updatedBook = { book with Quantity = book.Quantity - 1 }
                     
-                    books.Set updatedBook
-                    orders.Set order                    
+                    books.Set(updatedBook)
+                    orders.Set(order)
             }
             |> ignore                     
     )
@@ -62,7 +61,7 @@ let ``Get and Set operations should work correctly`` () =
     
 [<Fact>]
 let ``GetIds should be supported`` () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -70,7 +69,7 @@ let ``GetIds should be supported`` () =
         
         for i in [1..10] do
             let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
-            books.Set book
+            books.Set(book)
     )
     
     let result = db.ReadTransaction(fun ctx ->

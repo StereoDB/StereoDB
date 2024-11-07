@@ -11,7 +11,7 @@ open Tests.TestHelper
 
 [<Fact>]
 let ``Find should work correctly`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -20,9 +20,9 @@ let ``Find should work correctly`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
     )
     
     db.ReadTransaction(fun ctx ->
@@ -43,7 +43,7 @@ let ``Find should work correctly`` () =
     
 [<Fact>]
 let ``ValueIndex should handle deletion`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -52,9 +52,9 @@ let ``ValueIndex should handle deletion`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let book1 = ctx.Schema.Orders.BookIdIndex.Find(1) |> Seq.toArray
         let book3 = ctx.Schema.Orders.BookIdIndex.Find(3) |> Seq.toArray
@@ -73,7 +73,7 @@ let ``ValueIndex should handle deletion`` () =
     
 [<Fact>]
 let ``ValueIndex should handle reindexing`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -82,9 +82,9 @@ let ``ValueIndex should handle reindexing`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let book1 = ctx.Schema.Orders.BookIdIndex.Find(1) |> Seq.toArray
         let book3 = ctx.Schema.Orders.BookIdIndex.Find(3) |> Seq.toArray
@@ -93,7 +93,7 @@ let ``ValueIndex should handle reindexing`` () =
         test <@ book3.Length = 1 @>
         
         let order2 = { order2 with BookId = 50 } 
-        orders.Set order2
+        orders.Set(order2.Id, order2)
         
         let book1 = ctx.Schema.Orders.BookIdIndex.Find(1) |> Seq.toArray
         let book3 = ctx.Schema.Orders.BookIdIndex.Find(3) |> Seq.toArray

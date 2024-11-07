@@ -5,14 +5,14 @@ open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
 open StereoDB
 
-type IReadOnlyTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+type IReadOnlyTable<'TId, 'TEntity> =
     inherit ITable<'TId, 'TEntity>
     abstract GetIds: unit -> 'TId seq 
-    abstract TryGet: id:'TId * [<Out>]entity:'TEntity byref -> bool    
+    abstract TryGet: id:'TId * [<Out>]entity:'TEntity byref -> bool
     
-type IReadWriteTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId>> =
+type IReadWriteTable<'TId, 'TEntity> =
     inherit IReadOnlyTable<'TId, 'TEntity>    
-    abstract Set: entity:'TEntity -> unit
+    abstract Set: id:'TId * entity:'TEntity -> unit
     abstract Delete: id:'TId -> bool
 
 type ReadOnlyTsContextExt =    

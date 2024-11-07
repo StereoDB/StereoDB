@@ -11,7 +11,7 @@ open Tests.TestHelper
 
 [<Fact>]
 let ``Find should work correctly`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -20,9 +20,9 @@ let ``Find should work correctly`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [| 2; 1; 10 |] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [| 3 |] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
     )
     
     db.ReadTransaction(fun ctx ->
@@ -44,7 +44,7 @@ let ``Find should work correctly`` () =
     
 [<Fact>]
 let ``MultiValueIndex should handle deletion`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -53,9 +53,9 @@ let ``MultiValueIndex should handle deletion`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [| 2 |] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [| 3 |] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
         let category3 = ctx.Schema.Orders.CategoryIndex.Find(3) |> Seq.toArray
@@ -74,7 +74,7 @@ let ``MultiValueIndex should handle deletion`` () =
     
 [<Fact>]
 let ``MultiValueIndex should handle reindexing`` () =    
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -83,9 +83,9 @@ let ``MultiValueIndex should handle reindexing`` () =
         let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [| 2 |] }
         let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [| 3 |] }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
         let category3 = ctx.Schema.Orders.CategoryIndex.Find(3) |> Seq.toArray
@@ -94,7 +94,7 @@ let ``MultiValueIndex should handle reindexing`` () =
         test <@ category3.Length = 1 @>
         
         let order3 = { order3 with Categories = [| 2; 4 |] } 
-        orders.Set order3
+        orders.Set(order3.Id, order3)
         
         let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
         let category3 = ctx.Schema.Orders.CategoryIndex.Find(3) |> Seq.toArray
@@ -107,7 +107,7 @@ let ``MultiValueIndex should handle reindexing`` () =
     
 [<Fact>]
 let ``MultiValueIndex should support reindexing by hash comparison`` () =    
-    let db = StereoDb.create(Schema2())
+    let db = StereoDb.create(Schema2(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -117,9 +117,9 @@ let ``MultiValueIndex should support reindexing by hash comparison`` () =
         let order2 = { Id = 2; Categories = categories }
         let order3 = { Id = 3; Categories = categories }
       
-        orders.Set order1
-        orders.Set order2
-        orders.Set order3
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
         
         let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
         let category5 = ctx.Schema.Orders.CategoryIndex.Find(5) |> Seq.toArray
@@ -128,7 +128,7 @@ let ``MultiValueIndex should support reindexing by hash comparison`` () =
         test <@ category5.Length = 0 @>
         
         let order3 = { order3 with Categories = order3.Categories |> Set.add 5 |> Set.remove 2 } 
-        orders.Set order3
+        orders.Set(order3.Id, order3)
         
         let category2 = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
         let category5 = ctx.Schema.Orders.CategoryIndex.Find(5) |> Seq.toArray        

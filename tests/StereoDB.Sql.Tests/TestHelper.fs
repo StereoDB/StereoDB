@@ -9,9 +9,6 @@ type Book = {
     Title: string
     Quantity: int
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
 
 type MutableBook = {
     Id: int
@@ -19,9 +16,6 @@ type MutableBook = {
     ISBN: string
     mutable Quantity: int
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
 
 type NullableBook = {
     Id: int
@@ -30,25 +24,19 @@ type NullableBook = {
     NullableValueType: Nullable<int>
     NullableRefType: string
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
         
 type Order = {
     Id: Guid
     BookId: int
     Quantity: int    
 }
-with
-    interface IEntity<Guid> with
-        member this.Id = this.Id
 
 type Schema() =
-    let _books = {| Table = StereoDb.createTable<int, Book>() |}
-    let _mutableBooks = {| Table = StereoDb.createTable<int, MutableBook>() |}
-    let _nullableBooks = {| Table = StereoDb.createTable<int, NullableBook>() |}
+    let _books = {| Table = StereoDb.createTable<int, Book>("books") |}
+    let _mutableBooks = {| Table = StereoDb.createTable<int, MutableBook>("mutable_book") |}
+    let _nullableBooks = {| Table = StereoDb.createTable<int, NullableBook>("nullable_books") |}
     
-    let _ordersTable = StereoDb.createTable<Guid, Order>()
+    let _ordersTable = StereoDb.createTable<Guid, Order>("orders")
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
@@ -59,4 +47,6 @@ type Schema() =
     member this.MutableBooks = _mutableBooks
     member this.NullableBooks = _nullableBooks
     member this.Orders = _orders
-
+    
+    interface IDbSchema with
+        member this.AllTables = [_books.Table; _mutableBooks.Table; _nullableBooks.Table; _orders.Table]

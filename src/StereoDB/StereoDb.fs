@@ -4,7 +4,15 @@ open System
 open System.Threading
 open StereoDB
 
-type internal StereoDb<'TSchema>(schema: 'TSchema) =
+type StereoDbSettings = {
+    FileStorageEnabled: bool
+}
+with
+    static member Default = {
+        FileStorageEnabled = false
+    }
+
+type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, settings: StereoDbSettings) =
     
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
     
@@ -58,25 +66,39 @@ type internal StereoDb<'TSchema>(schema: 'TSchema) =
 
 namespace StereoDB.CSharp
 
+    open System.Runtime.CompilerServices
     open StereoDB
     
-    type StereoDb =    
-        static member Create(schema: 'TSchema) =
-            schema |> StereoDb :> IStereoDb<_>
+    type StereoDb =
+        static member Create(schema, settings) =
+            StereoDb(schema, settings) :> IStereoDb<_>
         
-        static member CreateTable() =
-            StereoDbTable<'TId, 'TEntity>()
+        static member CreateTable(tableName) =
+            StereoDbTable<'TId, 'TEntity>(tableName)
             :> IConfigurationTable<_, _>
+            
+    type StereoDbExtensions =
+    
+        [<Extension>]
+        static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
+            table.Set(entity.Id, entity)            
             
 namespace StereoDB.FSharp
 
+    open System.Runtime.CompilerServices
     open StereoDB
+    
+    type StereoDbExtensions =
+    
+        [<Extension>]
+        static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
+            table.Set(entity.Id, entity)
     
     module StereoDb =    
         
-        let create (schema: 'TSchema) =
-            schema |> StereoDb :> IStereoDb<_>
+        let create (schema, settings) =
+            StereoDb(schema, settings)  :> IStereoDb<_>
         
-        let createTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'TId: equality> () =
-            StereoDbTable<'TId, 'TEntity>()
-            :> IConfigurationTable<_, _>                     
+        let createTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality> (tableName) =
+            StereoDbTable<'TId, 'TEntity>(tableName)
+            :> IConfigurationTable<_, _>

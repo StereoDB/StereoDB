@@ -48,16 +48,14 @@ using System;
 using StereoDB;
 using StereoDB.CSharp;
 
-// defines a Book type that implements IEntity<TId>
-public record Book : IEntity<int>
+public record Book
 {
     public int Id { get; init; }
     public string Title { get; init; }
     public int Quantity { get; init; }
 }
 
-// defines an Order type that implements IEntity<TId>
-public record Order : IEntity<Guid>
+public record Order
 {
     public Guid Id { get; init; }
     public int BookId { get; init; }
@@ -77,7 +75,7 @@ public class OrdersSchema
 
 // defines a DB schema that includes Orders and Books tables
 // and a secondary index: 'BookIdIndex' for the Orders table
-public class Schema
+public class Schema : IDbSchema
 {
     public BooksSchema Books { get; }
     public OrdersSchema Orders { get; }
@@ -86,10 +84,10 @@ public class Schema
     {
         Books = new BooksSchema
         {
-            Table = StereoDb.CreateTable<int, Book>()
+            Table = StereoDb.CreateTable<int, Book>("books")
         };
 
-        var ordersTable = StereoDb.CreateTable<Guid, Order>();
+        var ordersTable = StereoDb.CreateTable<Guid, Order>("orders");
 
         Orders = new OrdersSchema()
         {
@@ -97,13 +95,15 @@ public class Schema
             BookIdIndex = ordersTable.AddValueIndex(order => order.BookId)
         };
     }
+    
+    public IEnumerable<ITable> AllTables => [Orders.Table, Books.Table];
 }
 
 public static class Demo
 {
     public static void Run()
     {
-        var db = StereoDb.Create(new Schema());
+        var db = StereoDb.Create(new Schema(), StereoDbSettings.Default);
 
         // 1) adds book
         // WriteTransaction: it's a read-write transaction: we can query and mutate data
@@ -173,32 +173,24 @@ open FsToolkit.ErrorHandling
 open StereoDB
 open StereoDB.FSharp
 
-// defines a Book type that implements IEntity<TId>
 type Book = {
     Id: int
     Title: string
     Quantity: int    
 }
-with
-    interface IEntity<int> with
-        member this.Id = this.Id
 
-// defines an Order type that implements IEntity<TId>
 type Order = {
     Id: Guid
     BookId: int
     Quantity: int    
 }
-with
-    interface IEntity<Guid> with
-        member this.Id = this.Id
 
 // defines a DB schema that includes Orders and Books tables
 // and a secondary index: 'BookIdIndex' for the Orders table
 type Schema() =
-    let _books = {| Table = StereoDb.createTable<int, Book>() |}
+    let _books = {| Table = StereoDb.createTable<int, Book>("books") |}
     
-    let _ordersTable = StereoDb.createTable<Guid, Order>()
+    let _ordersTable = StereoDb.createTable<Guid, Order>("orders")
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
@@ -206,9 +198,12 @@ type Schema() =
     
     member this.Books = _books
     member this.Orders = _orders
+    
+    interface IDbSchema with
+        member this.AllTables = [_books.Table; _orders.Table] 
 
 let test () =
-    let db = StereoDb.create(Schema())
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
 
     // 1) adds book
     // WriteTransaction: it's a read-write transaction: we can query and mutate data

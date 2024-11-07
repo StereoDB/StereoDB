@@ -3,38 +3,40 @@
 open System
 open System.Collections.Generic
 open StereoDB
+open StereoDB.Infra.Utils
 open StereoDB.SecondaryIndex
 
-type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'TId: equality>() =
+type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality>(tableName) =
     
-    let _data = Dictionary<'TId, 'TEntity>()    
+    let _tableIndex = Hash.calcDeterministicHash tableName
+    let _data = Dictionary<'TId, 'TEntity>()
     let _indexes = ResizeArray<ISecondaryIndex<'TId, 'TEntity>>()
-        
+
     let getIds () =
         _data.Keys |> Seq.map id       
         
-    let get (id) =
+    let get id =
         match _data.TryGetValue id with
         | true, v -> ValueSome v
         | _       -> ValueNone
            
-    let set (entity: 'TEntity) =            
-        match _data.TryGetValue entity.Id with
+    let set id entity =            
+        match _data.TryGetValue id with
         | true, oldEntity ->
             for index in _indexes do
-                index.TryReIndex(oldEntity, entity)
+                index.TryReIndex(id, oldEntity, entity)
             
         | _ ->
             for index in _indexes do
-                index.AddToIndex(entity)
+                index.AddToIndex(id, entity)
                 
-        _data[entity.Id] <- entity           
+        _data[id] <- entity           
             
-    let delete (id) =            
+    let delete id =            
         match _data.TryGetValue id with
         | true, entity ->                
             for index in _indexes do
-                index.RemoveFromIndex(entity)                
+                index.RemoveFromIndex(id, entity)                
         
         | _ -> ()
         
@@ -97,12 +99,16 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                     }
         }
     
-    interface IConfigurationTable<'TId, 'TEntity> with
+    interface IConfigurationTable<'TId, 'TEntity> with        
         member this.AddRangeScanIndex(getValue) = addRangeScanIndex getValue            
         member this.AddValueIndex(getValue) = addValueIndex getValue
         member this.AddMultiValueIndex(getValue, unsafeReindexByObjRefCompare) = addMultiValueIndex getValue unsafeReindexByObjRefCompare 
         
-    interface CSharp.IReadOnlyTable<'TId, 'TEntity> with
+    interface ITable with
+        member this.TableName = tableName
+        member this.TableIndex = _tableIndex
+        
+    interface CSharp.IReadOnlyTable<'TId, 'TEntity> with        
         member this.GetIds() = getIds()
         member this.TryGet(id, entity) =
             match _data.TryGetValue id with
@@ -110,16 +116,16 @@ type internal StereoDbTable<'TId, 'TEntity when 'TEntity :> IEntity<'TId> and 'T
                 entity <- v
                 true
                 
-            | _  -> false        
-        
-    interface FSharp.IReadOnlyTable<'TId, 'TEntity> with
-        member this.GetIds() = getIds()                          
-        member this.Get(id) = get id
+            | _  -> false
     
     interface CSharp.IReadWriteTable<'TId, 'TEntity> with        
-        member this.Set(entity) = set entity        
+        member this.Set(id, entity) = set id entity        
         member this.Delete(id) = delete id
         
+    interface FSharp.IReadOnlyTable<'TId, 'TEntity> with        
+        member this.GetIds() = getIds()                          
+        member this.Get(id) = get id        
+        
     interface FSharp.IReadWriteTable<'TId, 'TEntity> with        
-        member this.Set(entity) = set entity        
-        member this.Delete(id) = delete id        
+        member this.Set(id, entity) = set id entity        
+        member this.Delete(id) = delete id

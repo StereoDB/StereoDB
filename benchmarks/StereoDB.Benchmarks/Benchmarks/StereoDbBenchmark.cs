@@ -10,7 +10,7 @@ class UsersSchema
 
     public UsersSchema()
     {
-        var table = StereoDb.CreateTable<Guid, User>();
+        var table = StereoDb.CreateTable<Guid, User>("users");
         //var emailIndex = table.AddValueIndex(x => x.Email);
 
         Table = table;
@@ -18,9 +18,10 @@ class UsersSchema
     }
 }
 
-class Schema
+class Schema : IDbSchema
 {
     public UsersSchema Users { get; init; } = new();
+    public IEnumerable<ITable> AllTables => [Users.Table];
 }
 
 // class Db : IStereoDb<Schema>
@@ -36,7 +37,7 @@ class Schema
 public class StereoDbBenchmark
 {
     private List<User> _allData;
-    private IStereoDb<Schema> _db = StereoDb.Create(new Schema());
+    private IStereoDb<Schema> _db = StereoDb.Create(new Schema(), StereoDbSettings.Default);
     private Random _random = new();
 
     private Int64 CurrentDbWriteCount1 = 0;
