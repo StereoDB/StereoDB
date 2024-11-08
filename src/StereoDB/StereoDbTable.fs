@@ -8,7 +8,7 @@ open StereoDB.SecondaryIndex
 
 type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality>(tableName) =
     
-    let _tableIndex = Hash.calcDeterministicHash tableName
+    let _tableIndex = DeterministicHash.strToHash tableName
     let _data = Dictionary<'TId, 'TEntity>()
     let _indexes = ResizeArray<ISecondaryIndex<'TId, 'TEntity>>()
 

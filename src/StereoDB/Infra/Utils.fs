@@ -1,9 +1,9 @@
 ﻿module internal StereoDB.Infra.Utils
 
-type Hash =
+module DeterministicHash =
     
     /// Calculates deterministic hash
-    static member calcDeterministicHash (input: string) =
+    let strToHash (input: string) =
         let mutable hash = 23 // Arbitrary prime number seed        
         for c in input do            
             hash <- (hash * 31) ^^^ (int c) // Multiply hash and XOR with character code

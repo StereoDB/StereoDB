@@ -13,6 +13,7 @@
         <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
         <Compile Include="SecondaryIndex\MultiValueIndexTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
+        <Compile Include="UtilsTests.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 
