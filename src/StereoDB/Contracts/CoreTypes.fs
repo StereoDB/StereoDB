@@ -2,6 +2,7 @@
 
 open System
 open System.Runtime.InteropServices
+open StereoDB.Storage
 
 type ISecondaryIndex = interface end
 
@@ -21,13 +22,19 @@ type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IC
 
 type ITable =
     abstract TableName: string
-    abstract TableIndex: int
+    abstract TableIndex: byte
 
 type ITable<'TId, 'TEntity> =
     inherit ITable
+
+type internal ITableControl =
+    abstract InitStorage: StorageManager -> unit
+    abstract PrepareForCommit: unit -> unit
+    abstract SerializeToLog: unit -> unit
+    abstract Commit: unit -> unit
     
 type IConfigurationTable<'TId, 'TEntity> =    
-    inherit ITable<'TId, 'TEntity>
+    inherit ITable<'TId, 'TEntity>    
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>    
     abstract AddMultiValueIndex:
         getValues:Func<'TEntity, 'TValue seq> *

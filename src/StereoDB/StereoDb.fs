@@ -2,22 +2,48 @@
 
 open System
 open System.Threading
+open IcedTasks
 open StereoDB
+open StereoDB.Storage
 
 type StereoDbSettings = {
-    FileStorageEnabled: bool
+    DataSizeLargerRAM: bool
 }
 with
     static member Default = {
-        FileStorageEnabled = false
+        DataSizeLargerRAM = false
     }
 
 type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, settings: StereoDbSettings) =
     
+    let _storage = StorageManager.Init()
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
+    let _allTables = schema.AllTables |> Seq.cast<ITableControl> |> Seq.toArray
     
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
+    
+    do
+        if settings.DataSizeLargerRAM then
+            _allTables |> Array.iter(fun x -> x.InitStorage _storage)            
+          
+    let commit () = valueTask {
+        try
+            _lockSlim.EnterWriteLock()
+            _allTables |> Array.iter(_.PrepareForCommit())      
+        finally
+            _lockSlim.ExitWriteLock()
+                  
+        _allTables |> Array.Parallel.iter(_.SerializeToLog())
+        
+        try
+            _lockSlim.EnterWriteLock()
+            _allTables |> Array.iter(_.Commit())
+        finally
+            _lockSlim.ExitWriteLock()
+            
+        do! _storage.Commit()            
+    }
            
     interface CSharp.IStereoDb<'TSchema> with           
             
@@ -41,6 +67,8 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
                 transaction.Invoke(_rwCtx)
             finally
                 _lockSlim.ExitWriteLock()
+
+        member this.CommitAsync() = commit() |> ValueTask.toUnit            
                 
     interface FSharp.IStereoDb<'TSchema> with        
         member this.ReadTransaction(transaction: ReadOnlyTsContext<'TSchema> -> 'T voption) =
@@ -66,7 +94,6 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
 
 namespace StereoDB.CSharp
 
-    open System.Runtime.CompilerServices
     open StereoDB
     
     type StereoDb =
@@ -77,11 +104,11 @@ namespace StereoDB.CSharp
             StereoDbTable<'TId, 'TEntity>(tableName)
             :> IConfigurationTable<_, _>
             
-    type StereoDbExtensions =
-    
-        [<Extension>]
-        static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
-            table.Set(entity.Id, entity)            
+    // type StereoDbExtensions =
+    //
+    //     [<Extension>]
+    //     static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
+    //         table.Set(entity.Id, entity)            
             
 namespace StereoDB.FSharp
 

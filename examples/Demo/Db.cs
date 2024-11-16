@@ -1,23 +1,25 @@
-﻿namespace Demo;
+﻿using MessagePack;
+
+namespace Demo;
 
 using StereoDB;
 using StereoDB.CSharp;
 
-// defines a Book type that implements IEntity<TId>
+[MessagePackObject]
 public record Book
 {
-    public int Id { get; init; }
-    public string Title { get; init; }
-    public int Quantity { get; init; }
-    public int[] Categories { get; init; }
+    [Key(0)] public int Id { get; init; }
+    [Key(1)] public string Title { get; init; }
+    [Key(2)] public int Quantity { get; init; }
+    [Key(3)] public int[] Categories { get; init; }
 }
 
-// defines an Order type that implements IEntity<TId>
+[MessagePackObject]
 public record Order
 {
-    public Guid Id { get; init; }
-    public int BookId { get; init; }
-    public int Quantity { get; init; }
+    [Key(0)] public Guid Id { get; init; }
+    [Key(1)] public int BookId { get; init; }
+    [Key(2)] public int Quantity { get; init; }
 }
 
 public class BooksSchema

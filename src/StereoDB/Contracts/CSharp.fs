@@ -3,6 +3,7 @@
 open System
 open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
+open System.Threading.Tasks
 open StereoDB
 
 type IReadOnlyTable<'TId, 'TEntity> =
@@ -29,3 +30,4 @@ type IStereoDb<'TSchema> =
     abstract ReadTransaction: transaction:Func<ReadOnlyTsContext<'TSchema>, 'T> -> 'T
     abstract WriteTransaction: transaction:Func<ReadWriteTsContext<'TSchema>, 'T> -> 'T
     abstract WriteTransaction: transaction:Action<ReadWriteTsContext<'TSchema>> -> unit
+    abstract CommitAsync: unit -> ValueTask
