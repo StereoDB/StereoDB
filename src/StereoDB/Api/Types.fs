@@ -1,6 +1,7 @@
 ﻿namespace StereoDB
 
 open System
+open System.Collections
 open System.Runtime.InteropServices
 open StereoDB.Storage
 
@@ -28,17 +29,20 @@ type ITable<'TId, 'TEntity> =
     inherit ITable
 
 type internal ITableControl =
-    abstract InitStorage: StorageManager -> unit
-    abstract PrepareForCommit: unit -> unit
-    abstract SerializeToLog: unit -> unit
-    abstract Commit: unit -> unit
+    abstract InitStorage:            StorageLog -> unit
+    abstract DeserializeAndUpdateDb: logEntry:ReadOnlyMemory<byte> -> unit 
+    abstract GetChangesAndReset:     unit -> IDictionary
+    abstract WriteToLog:             tableChanges:IDictionary -> unit
+    abstract ReturnChangesToPool:    tableChanges:IDictionary -> unit
     
 type IConfigurationTable<'TId, 'TEntity> =    
     inherit ITable<'TId, 'TEntity>    
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>    
+    
     abstract AddMultiValueIndex:
         getValues:Func<'TEntity, 'TValue seq> *
         [<Optional; DefaultParameterValue(false:bool)>] unsafeReindexByObjRefCompare:bool -> IValueIndex<'TValue, 'TEntity>        
+    
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
 
 type IDbSchema =

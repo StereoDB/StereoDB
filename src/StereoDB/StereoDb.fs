@@ -3,47 +3,66 @@
 open System
 open System.Threading
 open IcedTasks
+open MessagePack
 open StereoDB
 open StereoDB.Storage
 
 type StereoDbSettings = {
-    DataSizeLargerRAM: bool
+    LocalPersistenceEnabled: bool
 }
 with
     static member Default = {
-        DataSizeLargerRAM = false
+        LocalPersistenceEnabled = false
     }
 
 type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, settings: StereoDbSettings) =
     
-    let _storage = StorageManager.Init()
+    let mutable _storageLog: StorageLog option = None
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
     let _allTables = schema.AllTables |> Seq.cast<ITableControl> |> Seq.toArray
+    let _allTablesDict = _allTables |> Seq.map(fun x -> (x :?> ITable).TableIndex, x) |> readOnlyDict
     
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
+    let deserializeAndUpdateDb (tableIndex, logEntry: ReadOnlyMemory<byte>) =
+        _allTablesDict[tableIndex].DeserializeAndUpdateDb logEntry
+                    
     do
-        if settings.DataSizeLargerRAM then
-            _allTables |> Array.iter(fun x -> x.InitStorage _storage)            
+        if settings.LocalPersistenceEnabled then
+            _storageLog <- Some (StorageLog.Init(deserializeAndUpdateDb))
+            _allTables |> Array.iter(fun x -> x.InitStorage _storageLog.Value)            
           
-    let commit () = valueTask {
-        try
-            _lockSlim.EnterWriteLock()
-            _allTables |> Array.iter(_.PrepareForCommit())      
-        finally
-            _lockSlim.ExitWriteLock()
-                  
-        _allTables |> Array.Parallel.iter(_.SerializeToLog())
-        
-        try
-            _lockSlim.EnterWriteLock()
-            _allTables |> Array.iter(_.Commit())
-        finally
-            _lockSlim.ExitWriteLock()
+    let commit () =
+        match _storageLog with
+        | Some store ->
+            let tablesChanges =
+                try
+                    _lockSlim.EnterWriteLock()
+                    _allTables |> Array.map(_.GetChangesAndReset())                
+                finally
+                    _lockSlim.ExitWriteLock()        
             
-        do! _storage.Commit()            
-    }
+            for i = 0 to _allTables.Length - 1 do        
+                let changes = tablesChanges[i]
+                let table = _allTables[i]
+                
+                table.WriteToLog changes
+                table.ReturnChangesToPool changes
+            
+            valueTask {
+                do! store.CommitAsync()
+            }
+        
+        | None -> ValueTask.singleton()            
+           
+    member internal this.Restore() = if _storageLog.IsSome then _storageLog.Value.Restore()    
+         
+    interface IDisposable with
+        member this.Dispose() =
+            if _storageLog.IsSome then
+                use _ = _storageLog.Value
+                ()            
            
     interface CSharp.IStereoDb<'TSchema> with           
             
@@ -95,25 +114,22 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
 namespace StereoDB.CSharp
 
     open StereoDB
+    open StereoDB.Table
     
     type StereoDb =
         static member Create(schema, settings) =
-            StereoDb(schema, settings) :> IStereoDb<_>
+            let db = new StereoDb<'TSchema>(schema, settings)
+            db.Restore()
+            db :> IStereoDb<_>
         
         static member CreateTable(tableName) =
-            StereoDbTable<'TId, 'TEntity>(tableName)
-            :> IConfigurationTable<_, _>
-            
-    // type StereoDbExtensions =
-    //
-    //     [<Extension>]
-    //     static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
-    //         table.Set(entity.Id, entity)            
+            StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>            
             
 namespace StereoDB.FSharp
 
     open System.Runtime.CompilerServices
     open StereoDB
+    open StereoDB.Table
     
     type StereoDbExtensions =
     
@@ -124,8 +140,9 @@ namespace StereoDB.FSharp
     module StereoDb =    
         
         let create (schema, settings) =
-            StereoDb(schema, settings)  :> IStereoDb<_>
+            let db = new StereoDb<'TSchema>(schema, settings)
+            db.Restore()
+            db :> IStereoDb<_>            
         
         let createTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality> (tableName) =
-            StereoDbTable<'TId, 'TEntity>(tableName)
-            :> IConfigurationTable<_, _>
+            StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>

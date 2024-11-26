@@ -23,8 +23,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB.Sql", "src\StereoD
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "StereoDB.Sql.Tests", "tests\StereoDB.Sql.Tests\StereoDB.Sql.Tests.fsproj", "{DA358BB7-6F56-472B-A9C8-85861386A7C2}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FasterDemo", "examples\FasterDemo\FasterDemo.fsproj", "{E9CEE150-3C75-4B1A-8985-2B350889233A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -59,10 +57,6 @@ Global
 		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DA358BB7-6F56-472B-A9C8-85861386A7C2}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E9CEE150-3C75-4B1A-8985-2B350889233A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E9CEE150-3C75-4B1A-8985-2B350889233A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E9CEE150-3C75-4B1A-8985-2B350889233A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E9CEE150-3C75-4B1A-8985-2B350889233A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -73,7 +67,6 @@ Global
 		{0CE765A3-11A9-44C5-9E54-0BAB0B4D447B} = {F950EB26-E2C8-47A0-877C-4A64BCD7C792}
 		{384974AB-D945-48EE-B7ED-11E688DEAA0B} = {0394F1BC-7633-4A5B-91D9-870BB3D3A842}
 		{DA358BB7-6F56-472B-A9C8-85861386A7C2} = {1C2B539B-C9CD-484F-AB8E-D87645C74DF4}
-		{E9CEE150-3C75-4B1A-8985-2B350889233A} = {F950EB26-E2C8-47A0-877C-4A64BCD7C792}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9735FB40-9535-406B-A4EF-D04BBA6879DE}

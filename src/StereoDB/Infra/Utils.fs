@@ -1,5 +1,7 @@
 ﻿module internal StereoDB.Infra.Utils
 
+open System.Collections.Generic
+
 module DeterministicHash =
     
     /// Calculates deterministic hash
@@ -12,8 +14,10 @@ module DeterministicHash =
     let inline mapToByte (hash: int) =
         byte (hash % 256)
         
-module Serializer =
+module Array =
     
-    let serialize () = ()
-    
-    let deSerialize () = ()
+    let copyDictToArray (dict: Dictionary<_,'T>) (array: 'T[]) =
+        let mutable index = 0
+        for ch in dict do
+            array[index] <- ch.Value
+            index <- index + 1
