@@ -3,7 +3,6 @@
 open System
 open System.Threading
 open IcedTasks
-open MessagePack
 open StereoDB
 open StereoDB.Storage
 
@@ -56,13 +55,17 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
         
         | None -> ValueTask.singleton()            
            
-    member internal this.Restore() = if _storageLog.IsSome then _storageLog.Value.Restore()    
+    member internal this.Restore() =
+        if _storageLog.IsSome then
+            _storageLog.Value.Restore()
+            
+        _allTables |> Array.iter(_.EnableChangeTracking())
          
     interface IDisposable with
         member this.Dispose() =
             if _storageLog.IsSome then
                 use _ = _storageLog.Value
-                ()            
+                ()
            
     interface CSharp.IStereoDb<'TSchema> with           
             

@@ -30,7 +30,8 @@ type ITable<'TId, 'TEntity> =
 
 type internal ITableControl =
     abstract InitStorage:            StorageLog -> unit
-    abstract DeserializeAndUpdateDb: logEntry:ReadOnlyMemory<byte> -> unit 
+    abstract DeserializeAndUpdateDb: logEntry:ReadOnlyMemory<byte> -> unit
+    abstract EnableChangeTracking:   unit -> unit
     abstract GetChangesAndReset:     unit -> IDictionary
     abstract WriteToLog:             tableChanges:IDictionary -> unit
     abstract ReturnChangesToPool:    tableChanges:IDictionary -> unit

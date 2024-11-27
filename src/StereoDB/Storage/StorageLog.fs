@@ -133,7 +133,7 @@ type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * Re
             use e = entry
             let tableIndex = entry.Memory.Span[0]             
             if tableIndex <> 0uy then
-                let logEntry = entry.Memory.Slice(1) // skip tableIndex
+                let logEntry = entry.Memory.Slice(1, entryLength - 1) // skip tableIndex
                 deserializeAndUpdateDb(tableIndex, logEntry)            
     
     interface IDisposable with

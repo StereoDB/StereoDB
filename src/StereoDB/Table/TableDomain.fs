@@ -50,7 +50,7 @@ module internal Changes =
 module internal TableOperations =
     
     let createMemData<'TId, 'TEntity when 'TId: equality> tableName =
-        { TableIndex = tableName |> DeterministicHash.strToHash |> DeterministicHash.mapToByte
+        { TableIndex = tableName |> DeterministicHash.strToHash |> DeterministicHash.mapToByte |> DeterministicHash.castToNotReservedBytes
           Data = Dictionary<'TId, TableRecord<'TEntity>>()
           Indexes = ResizeArray<ISecondaryIndex<'TId,'TEntity>>() }
     

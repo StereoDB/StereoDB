@@ -1,7 +1,6 @@
-﻿using MessagePack;
+﻿namespace Demo;
 
-namespace Demo;
-
+using MessagePack;
 using StereoDB;
 using StereoDB.CSharp;
 
