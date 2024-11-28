@@ -7,14 +7,17 @@ open StereoDB.Storage
 
 type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality>(tableName) =
 
+    let mutable _storageLog: StorageLog option = None
+    let mutable _entityAddressStore: EntityAddressStore option = None
+    
     let _memData = TableOperations.createMemData<'TId, 'TEntity> tableName
-    let _data = _memData.Data    
+    let _data = _memData.Data
+    let _tableIndex = _memData.TableIndex
     
     let _changesPool = Changes.createPool()
-    let _changeTracking = { Changes = Changes.rentDictForChanges _changesPool; IsEnabled = false } 
-    let mutable _storage: StorageLog option = None
-   
-    let deserializeAndUpdateDb (logEntry: ReadOnlyMemory<byte>) =
+    let _changeTracking = { Changes = Changes.rentDictForChanges _changesPool; IsEnabled = false }
+
+    let updateEntity (logEntry: ReadOnlyMemory<byte>) =
         try        
             let mutable reader = MessagePackReader(logEntry)
             let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader)
@@ -27,6 +30,17 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
                 TableOperations.set header.Id entity _changeTracking _memData
         with
             ex -> ()
+            
+    let getEntityAddress (logEntry: ReadOnlyMemory<byte>) (logAddress: int64) =
+        try
+            let mutable reader = MessagePackReader(logEntry)
+            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader)
+            if header.IsRemoved then
+                Ok { Id = header.Id.ToString(); TableIndex = _tableIndex; Address = -1 }
+            else
+                Ok { Id = header.Id.ToString(); TableIndex = _tableIndex; Address = logAddress }
+        with
+            ex -> Error ex            
     
     let getChangesAndReset () =
         if _changeTracking.Changes.Count > 0 then
@@ -38,15 +52,27 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
     
     interface ITable with
         member this.TableName = tableName
-        member this.TableIndex = _memData.TableIndex
+        member this.TableIndex = _tableIndex
         
     interface ITableControl with
-        member this.InitStorage(storage)              = _storage <- Some storage        
-        member this.DeserializeAndUpdateDb(logEntry)  = deserializeAndUpdateDb logEntry
+        member this.InitStorage(storageLog, entityAddressStore) =
+            _storageLog <- Some storageLog
+            _entityAddressStore <- Some entityAddressStore
+            
+            // match typeof<'TId> with
+            // | t when t = typeof<int>     -> _keyStore.Value.CreateLogAddressInt(_memData.TableIndex)
+            // | t when t = typeof<float>   -> _keyStore.Value.CreateLogAddressFloat(_memData.TableIndex)
+            // | t when t = typeof<decimal> -> _keyStore.Value.CreateLogAddressDecimal(_memData.TableIndex)
+            // | t when t = typeof<string>  -> _keyStore.Value.CreateKeysAddressTable(_memData.TableIndex)
+            // | _                          -> _keyStore.Value.CreateKeysAddressTable(_memData.TableIndex)
+            
+        member this.UpdateEntity(logEntry) = updateEntity logEntry
+        member this.GetEntityAddress(logEntry, logAddress) = getEntityAddress logEntry logAddress
+        
         member this.EnableChangeTracking()            = _changeTracking.IsEnabled <- true        
         member this.GetChangesAndReset()              = getChangesAndReset()
-        member this.WriteToLog(tableChanges)          = TableOperations.writeToLog<'TId,'TEntity> _memData.TableIndex tableChanges _storage        
-        member this.ReturnChangesToPool(tableChanges) = Changes.returnChangesToPool _changesPool tableChanges                                   
+        member this.WriteToLog(tableChanges)          = TableOperations.writeToLog<'TId,'TEntity> _tableIndex tableChanges _storageLog        
+        member this.ReturnChangesToPool(tableChanges) = Changes.returnChangesToPool _changesPool tableChanges                                           
         
     interface IConfigurationTable<'TId, 'TEntity> with        
         member this.AddRangeScanIndex(getValue) = TableIndex.addRangeScanIndex _memData getValue

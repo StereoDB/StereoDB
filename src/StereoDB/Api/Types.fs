@@ -29,12 +29,13 @@ type ITable<'TId, 'TEntity> =
     inherit ITable
 
 type internal ITableControl =
-    abstract InitStorage:            StorageLog -> unit
-    abstract DeserializeAndUpdateDb: logEntry:ReadOnlyMemory<byte> -> unit
-    abstract EnableChangeTracking:   unit -> unit
-    abstract GetChangesAndReset:     unit -> IDictionary
-    abstract WriteToLog:             tableChanges:IDictionary -> unit
-    abstract ReturnChangesToPool:    tableChanges:IDictionary -> unit
+    abstract InitStorage:          StorageLog * EntityAddressStore -> unit
+    abstract UpdateEntity:         logEntry:ReadOnlyMemory<byte> -> unit
+    abstract GetEntityAddress:     logEntry:ReadOnlyMemory<byte> * logAddress:int64 -> Result<EntityAddress,exn>
+    abstract EnableChangeTracking: unit -> unit
+    abstract GetChangesAndReset:   unit -> IDictionary
+    abstract WriteToLog:           tableChanges:IDictionary -> unit
+    abstract ReturnChangesToPool:  tableChanges:IDictionary -> unit
     
 type IConfigurationTable<'TId, 'TEntity> =    
     inherit ITable<'TId, 'TEntity>    

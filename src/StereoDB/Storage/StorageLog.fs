@@ -1,10 +1,9 @@
 ﻿namespace StereoDB.Storage
-#nowarn "3391"
+#nowarn "3391" // warning about implicit conversion
 
 open System
 open System.Buffers
 open System.Collections.Generic
-open System.Runtime.CompilerServices
 open System.Threading
 open System.Threading.Tasks
 open FASTER.core
@@ -13,26 +12,7 @@ open MessagePack
 open Microsoft.IO
 open StereoDB.Infra.Utils
 
-[<MessagePackObject; Struct; IsReadOnly>]
-type BulkHeader = {
-    [<Key(0)>] BulkNumber: int64
-    [<Key(1)>] IsStart: bool
-    [<Key(2)>] RecordsCount: int
-}
-
-[<MessagePackObject; Struct; IsReadOnly>]
-type RecordHeader<'TId> = {
-    [<Key(0)>] Id: 'TId
-    [<Key(1)>] IsRemoved: bool    
-}
-
-type internal ChangedRecord<'TId, 'TEntity> = {
-    Id: 'TId
-    Entity: 'TEntity
-    IsRemoved: bool        
-}
-
-type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * ReadOnlyMemory<byte> -> unit) = // tableIndex * entry
+type internal StorageLog(fasterLog: FasterLog, updateEntity: byte * ReadOnlyMemory<byte> -> unit) = // tableIndex * entry
     
     let _memoryManager = RecyclableMemoryStreamManager()
     let mutable _currentBulkNumber = 0L
@@ -40,7 +20,7 @@ type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * Re
     let writeBulk (bulk: BulkHeader) =
         use stream = _memoryManager.GetStream()
         
-        stream.WriteByte 0uy
+        stream.WriteByte Constants.BulkRecord
         MessagePackSerializer.Serialize(writer = stream, value = bulk)
         
         let msg = stream.GetBuffer().AsSpan(0, int stream.Length)
@@ -92,6 +72,8 @@ type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * Re
             
         itemsWritten
     
+    member this.FasterLog = fasterLog
+    
     member this.WriteStartBulk() =
         _currentBulkNumber <- _currentBulkNumber + 1L
         let startBulk = { BulkNumber = _currentBulkNumber; IsStart = true; RecordsCount = 0 }        
@@ -123,7 +105,7 @@ type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * Re
         fasterLog.CommitAsync()        
     
     member this.Restore() =
-        use iterator = fasterLog.Scan(fasterLog.BeginAddress, fasterLog.TailAddress, name = null, recover = false)
+        use iterator = fasterLog.Scan(fasterLog.BeginAddress, fasterLog.SafeTailAddress, name = null, recover = false)
         
         let mutable entry: IMemoryOwner<byte> = null
         let mutable currentAddress = 0L
@@ -132,16 +114,16 @@ type internal StorageLog(fasterLog: FasterLog, deserializeAndUpdateDb: byte * Re
         while iterator.GetNext(MemoryPool.Shared, &entry, &entryLength, &currentAddress) do
             use e = entry
             let tableIndex = entry.Memory.Span[0]             
-            if tableIndex <> 0uy then
+            if tableIndex <> Constants.BulkRecord then
                 let logEntry = entry.Memory.Slice(1, entryLength - 1) // skip tableIndex
-                deserializeAndUpdateDb(tableIndex, logEntry)            
+                updateEntity(tableIndex, logEntry)            
     
     interface IDisposable with
         member this.Dispose() =
             fasterLog.Commit(spinWait = true)
             fasterLog.Dispose()            
     
-    static member Init(deserializeAndUpdateDb) =
+    static member Init(updateEntity) =
         let config = new FasterLogSettings("stereo_db", deleteDirOnDispose = false)
         let fasterLog = new FasterLog(config)
-        new StorageLog(fasterLog, deserializeAndUpdateDb)
+        new StorageLog(fasterLog, updateEntity)

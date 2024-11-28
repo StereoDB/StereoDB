@@ -5,6 +5,7 @@ open System.Threading
 open IcedTasks
 open StereoDB
 open StereoDB.Storage
+open StereoDB.Infra.Utils
 
 type StereoDbSettings = {
     LocalPersistenceEnabled: bool
@@ -17,6 +18,8 @@ with
 type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, settings: StereoDbSettings) =
     
     let mutable _storageLog: StorageLog option = None
+    let mutable _entityAddressStore: EntityAddressStore option = None
+    
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
     let _allTables = schema.AllTables |> Seq.cast<ITableControl> |> Seq.toArray
     let _allTablesDict = _allTables |> Seq.map(fun x -> (x :?> ITable).TableIndex, x) |> readOnlyDict
@@ -24,13 +27,20 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
-    let deserializeAndUpdateDb (tableIndex, logEntry: ReadOnlyMemory<byte>) =
-        _allTablesDict[tableIndex].DeserializeAndUpdateDb logEntry
+    let updateEntity (tableIndex, logEntry: ReadOnlyMemory<byte>) =
+        _allTablesDict[tableIndex].UpdateEntity logEntry
+        
+    let getEntityAddress (tableIndex, logEntry: ReadOnlyMemory<byte>, logAddress: int64) =
+        _allTablesDict[tableIndex].GetEntityAddress(logEntry, logAddress)
                     
     do
+        MessagePack.initDefaultOptions()
+        
         if settings.LocalPersistenceEnabled then
-            _storageLog <- Some (StorageLog.Init(deserializeAndUpdateDb))
-            _allTables |> Array.iter(fun x -> x.InitStorage _storageLog.Value)            
+            _storageLog <- Some (StorageLog.Init(updateEntity))
+            _entityAddressStore <- Some (EntityAddressStore(_storageLog.Value.FasterLog, getEntityAddress))
+            _entityAddressStore.Value.Init()
+            _allTables |> Array.iter(_.InitStorage(_storageLog.Value, _entityAddressStore.Value))            
           
     let commit () =
         match _storageLog with
@@ -58,6 +68,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
     member internal this.Restore() =
         if _storageLog.IsSome then
             _storageLog.Value.Restore()
+            _entityAddressStore.Value.StartEntityAddressUpdate()
             
         _allTables |> Array.iter(_.EnableChangeTracking())
          

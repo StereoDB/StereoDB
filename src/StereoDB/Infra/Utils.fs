@@ -1,6 +1,8 @@
 ﻿module internal StereoDB.Infra.Utils
 
 open System.Collections.Generic
+open MessagePack
+open MessagePack.Resolvers
 
 module DeterministicHash =
     
@@ -28,3 +30,9 @@ module Array =
         for ch in dict do
             array[index] <- ch.Value
             index <- index + 1
+            
+module MessagePack =
+    
+    let initDefaultOptions () =
+        let options = MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)
+        MessagePackSerializer.DefaultOptions <- options

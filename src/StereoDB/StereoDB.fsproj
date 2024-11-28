@@ -24,7 +24,9 @@
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
+        <Compile Include="Storage\StorageTypes.fs" />
         <Compile Include="Storage\StorageLog.fs" />        
+        <Compile Include="Storage\EntityAddressStore.fs" />        
         <Compile Include="Api\Types.fs" />        
         <Compile Include="Api\CSharp.fs" />
         <Compile Include="Api\FSharp.fs" />                
@@ -46,7 +48,8 @@
         <PackageReference Include="FsToolkit.ErrorHandling.IcedTasks" Version="4.18.0" />        
         <PackageReference Include="MessagePack" Version="2.5.192" />
         <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />        
-        <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />        
+        <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
+        <PackageReference Include="RepoDb.Sqlite.Microsoft" Version="1.13.1" />        
         <PackageReference Include="System.Threading.Channels" Version="9.0.0" />        
     </ItemGroup>
 
