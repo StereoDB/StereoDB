@@ -18,7 +18,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
     let _changeTracking = { Changes = Changes.rentDictForChanges _changesPool; IsEnabled = false }
 
     let updateEntity (logEntry: ReadOnlyMemory<byte>) =
-        try        
+        try
             let mutable reader = MessagePackReader(logEntry)
             let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader)
             if header.IsRemoved then
@@ -33,12 +33,11 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
             
     let getEntityAddress (logEntry: ReadOnlyMemory<byte>) (logAddress: int64) =
         try
-            let mutable reader = MessagePackReader(logEntry)
-            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader)
+            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(logEntry)
             if header.IsRemoved then
-                Ok { Id = header.Id.ToString(); TableIndex = _tableIndex; Address = -1 }
+                Ok (EntityAddress.createRemoved (header.Id.ToString()) _tableIndex)
             else
-                Ok { Id = header.Id.ToString(); TableIndex = _tableIndex; Address = logAddress }
+                Ok (EntityAddress.create (header.Id.ToString()) _tableIndex logAddress)
         with
             ex -> Error ex            
     
@@ -55,16 +54,9 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         member this.TableIndex = _tableIndex
         
     interface ITableControl with
-        member this.InitStorage(storageLog, entityAddressStore) =
+        member this.SetStorage(storageLog, entityAddressStore) =
             _storageLog <- Some storageLog
             _entityAddressStore <- Some entityAddressStore
-            
-            // match typeof<'TId> with
-            // | t when t = typeof<int>     -> _keyStore.Value.CreateLogAddressInt(_memData.TableIndex)
-            // | t when t = typeof<float>   -> _keyStore.Value.CreateLogAddressFloat(_memData.TableIndex)
-            // | t when t = typeof<decimal> -> _keyStore.Value.CreateLogAddressDecimal(_memData.TableIndex)
-            // | t when t = typeof<string>  -> _keyStore.Value.CreateKeysAddressTable(_memData.TableIndex)
-            // | _                          -> _keyStore.Value.CreateKeysAddressTable(_memData.TableIndex)
             
         member this.UpdateEntity(logEntry) = updateEntity logEntry
         member this.GetEntityAddress(logEntry, logAddress) = getEntityAddress logEntry logAddress

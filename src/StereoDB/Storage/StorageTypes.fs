@@ -23,8 +23,7 @@ type internal ChangedRecord<'TId, 'TEntity> = {
     IsRemoved: bool        
 }
 
-[<Struct; IsReadOnly>]
-type internal EntityAddress = {
+type EntityAddress = {
     Id: string
     TableIndex: byte
     Address: int64
@@ -34,8 +33,15 @@ module internal EntityAddress =
     
     let inline getCompositeKey (record: EntityAddress) =
         $"{record.Id}-{record.TableIndex}"
-
-module internal Constants =
-    
-    [<Literal>]
-    let BulkRecord = 0uy
+        
+    let inline isRemoved (record: EntityAddress) =
+        record.Address = 0
+        
+    let inline createRemoved id tableIndex =
+        { Id = id; TableIndex = tableIndex; Address = 0 }
+        
+    let inline create id tableIndex address =
+        { Id = id; TableIndex = tableIndex; Address = address }
+        
+    let inline getMaxAddress (addresses: EntityAddress seq) =
+        addresses |> Seq.maxBy(_.Address)

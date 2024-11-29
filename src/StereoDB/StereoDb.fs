@@ -2,6 +2,7 @@
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open IcedTasks
 open StereoDB
 open StereoDB.Storage
@@ -17,8 +18,14 @@ with
 
 type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, settings: StereoDbSettings) =
     
+    let mutable _working = true
+    let mutable _currentCheckpointTask = Task.CompletedTask
+    let mutable _currentCheckpointCancelToken = new CancellationTokenSource()
+    
     let mutable _storageLog: StorageLog option = None
     let mutable _entityAddressStore: EntityAddressStore option = None
+    let mutable _writeTsCountFromLatestCheckpoint = 0L
+    let mutable _writeTsCountFromLatestCommit = 0L
     
     let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
     let _allTables = schema.AllTables |> Seq.cast<ITableControl> |> Seq.toArray
@@ -27,28 +34,29 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
-    let updateEntity (tableIndex, logEntry: ReadOnlyMemory<byte>) =
+    let updateEntity (tableIndex, logEntry) =
         _allTablesDict[tableIndex].UpdateEntity logEntry
         
-    let getEntityAddress (tableIndex, logEntry: ReadOnlyMemory<byte>, logAddress: int64) =
+    let getEntityAddress (tableIndex, logEntry, logAddress) =
         _allTablesDict[tableIndex].GetEntityAddress(logEntry, logAddress)
-                    
-    do
-        MessagePack.initDefaultOptions()
+
+    let restoreDb (storageLog: StorageLog) (addressStore: EntityAddressStore) =
+        valueTask {
+            let! latestSavedAddress = addressStore.LoadEntities()
+            
+            storageLog.RestoreFrom latestSavedAddress
+            
+            _allTables |> Array.iter(_.EnableChangeTracking())
+        }
         
-        if settings.LocalPersistenceEnabled then
-            _storageLog <- Some (StorageLog.Init(updateEntity))
-            _entityAddressStore <- Some (EntityAddressStore(_storageLog.Value.FasterLog, getEntityAddress))
-            _entityAddressStore.Value.Init()
-            _allTables |> Array.iter(_.InitStorage(_storageLog.Value, _entityAddressStore.Value))            
-          
-    let commit () =
-        match _storageLog with
-        | Some store ->
-            let tablesChanges =
+    let commit (storageLog: StorageLog) = valueTask {
+        if Interlocked.Read(&_writeTsCountFromLatestCommit) > 0 then
+            
+            let tablesChanges =                
                 try
                     _lockSlim.EnterWriteLock()
-                    _allTables |> Array.map(_.GetChangesAndReset())                
+                    Interlocked.Exchange(&_writeTsCountFromLatestCommit, 0L) |> ignore
+                    _allTables |> Array.map(_.GetChangesAndReset())                    
                 finally
                     _lockSlim.ExitWriteLock()        
             
@@ -57,51 +65,94 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
                 let table = _allTables[i]
                 
                 table.WriteToLog changes
-                table.ReturnChangesToPool changes
+                table.ReturnChangesToPool changes            
             
-            valueTask {
-                do! store.CommitAsync()
-            }
+            do! storageLog.CommitAsync()
+    }
+    
+    let startAutoCommit (storageLog: StorageLog) = valueTask {
+        while _working do
+            do! commit storageLog            
+            do! Task.Delay Constants.AutoCommitDelay
+    }
         
-        | None -> ValueTask.singleton()            
-           
-    member internal this.Restore() =
-        if _storageLog.IsSome then
-            _storageLog.Value.Restore()
-            _entityAddressStore.Value.StartEntityAddressUpdate()
+    let startAutoCheckpoint (addressStore: EntityAddressStore) = valueTask {        
+        while _working do
+            try
+                if Interlocked.Read(&_writeTsCountFromLatestCheckpoint) > Constants.WriteTsLimitToCheckpoint && _currentCheckpointTask.IsCompleted then
+                    Interlocked.Exchange(&_writeTsCountFromLatestCheckpoint, 0L) |> ignore
+                    _currentCheckpointCancelToken <- new CancellationTokenSource()
+                    _currentCheckpointTask <- addressStore.StartCheckpoint(_currentCheckpointCancelToken.Token)
+                
+                do! Task.Delay Constants.CheckpointDelay
+            with
+                ex -> ()
+    }
+    
+    member this.InitDb() = valueTask {
+        MessagePack.initDefaultOptions()
+        
+        if settings.LocalPersistenceEnabled then            
+            let storageLog   = StorageLog.Init updateEntity
+            let addressStore = EntityAddressStore.Init(storageLog.FasterLog, getEntityAddress, updateEntity)
             
-        _allTables |> Array.iter(_.EnableChangeTracking())
+            _storageLog         <- Some storageLog
+            _entityAddressStore <- Some addressStore
+            
+            _allTables |> Array.iter(_.SetStorage(storageLog, addressStore))
+            
+            do! restoreDb storageLog addressStore
+            
+            startAutoCommit storageLog |> ignore
+            startAutoCheckpoint addressStore |> ignore
+    }
          
-    interface IDisposable with
-        member this.Dispose() =
-            if _storageLog.IsSome then
-                use _ = _storageLog.Value
-                ()
+    interface IAsyncDisposable with
+        member this.DisposeAsync() =
+            valueTask {
+                _working <- false
+                
+                if _storageLog.IsSome then
+                    do! commit _storageLog.Value
+                    
+                    _currentCheckpointCancelToken.Cancel()
+                    _currentCheckpointTask.Wait()            
+                    
+                    use _ = _storageLog.Value
+                    use _ = _entityAddressStore.Value
+                    
+                    return ()
+            }
+            |> ValueTask.toUnit
            
     interface CSharp.IStereoDb<'TSchema> with           
             
-        member this.ReadTransaction<'T>(transaction: Func<ReadOnlyTsContext<'TSchema>, 'T>) =
+        member this.ReadTransaction<'T>(transaction: Func<ReadOnlyTsContext<'TSchema>, 'T>) =            
             try
                 _lockSlim.EnterReadLock()
-                transaction.Invoke(_rCtx)            
+                transaction.Invoke(_rCtx)                
             finally
                 _lockSlim.ExitReadLock()            
             
         member this.WriteTransaction<'T>(transaction: Func<ReadWriteTsContext<'TSchema>, 'T>) =
+            Interlocked.Increment(&_writeTsCountFromLatestCheckpoint) |> ignore
+            Interlocked.Increment(&_writeTsCountFromLatestCommit) |> ignore
+            
             try
-                _lockSlim.EnterWriteLock()
+                _lockSlim.EnterWriteLock()                 
                 transaction.Invoke(_rwCtx)
             finally
-                _lockSlim.ExitWriteLock()           
+                _lockSlim.ExitWriteLock()                            
                         
         member this.WriteTransaction(transaction: Action<ReadWriteTsContext<'TSchema>>) =
+            Interlocked.Increment(&_writeTsCountFromLatestCheckpoint) |> ignore
+            Interlocked.Increment(&_writeTsCountFromLatestCommit) |> ignore
+            
             try
                 _lockSlim.EnterWriteLock()
                 transaction.Invoke(_rwCtx)
             finally
                 _lockSlim.ExitWriteLock()
-
-        member this.CommitAsync() = commit() |> ValueTask.toUnit            
                 
     interface FSharp.IStereoDb<'TSchema> with        
         member this.ReadTransaction(transaction: ReadOnlyTsContext<'TSchema> -> 'T voption) =
@@ -112,6 +163,9 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
                 _lockSlim.ExitReadLock()
             
         member this.WriteTransaction<'T>(transaction: ReadWriteTsContext<'TSchema> -> 'T voption) =
+            Interlocked.Increment(&_writeTsCountFromLatestCheckpoint) |> ignore
+            Interlocked.Increment(&_writeTsCountFromLatestCommit) |> ignore
+            
             try
                 _lockSlim.EnterWriteLock()
                 transaction _rwCtx            
@@ -119,6 +173,9 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
                 _lockSlim.ExitWriteLock()
         
         member this.WriteTransaction(transaction: ReadWriteTsContext<'TSchema> -> unit) =
+            Interlocked.Increment(&_writeTsCountFromLatestCheckpoint) |> ignore
+            Interlocked.Increment(&_writeTsCountFromLatestCommit) |> ignore
+            
             try
                 _lockSlim.EnterWriteLock()
                 transaction _rwCtx
@@ -127,20 +184,23 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(schema: 'TSchema, se
 
 namespace StereoDB.CSharp
 
+    open IcedTasks
     open StereoDB
     open StereoDB.Table
     
     type StereoDb =
-        static member Create(schema, settings) =
+        static member Init(schema, settings) = valueTask {
             let db = new StereoDb<'TSchema>(schema, settings)
-            db.Restore()
-            db :> IStereoDb<_>
+            do! db.InitDb()
+            return db :> IStereoDb<_>
+        }
         
         static member CreateTable(tableName) =
             StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>            
             
 namespace StereoDB.FSharp
 
+    open IcedTasks
     open System.Runtime.CompilerServices
     open StereoDB
     open StereoDB.Table
@@ -153,10 +213,11 @@ namespace StereoDB.FSharp
     
     module StereoDb =    
         
-        let create (schema, settings) =
+        let init (schema, settings) = valueTask {
             let db = new StereoDb<'TSchema>(schema, settings)
-            db.Restore()
-            db :> IStereoDb<_>            
+            do! db.InitDb()
+            return db :> IStereoDb<_>
+        }
         
         let createTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality> (tableName) =
             StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>

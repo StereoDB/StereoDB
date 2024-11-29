@@ -10,6 +10,7 @@ open FASTER.core
 open IcedTasks
 open MessagePack
 open Microsoft.IO
+open StereoDB
 open StereoDB.Infra.Utils
 
 type internal StorageLog(fasterLog: FasterLog, updateEntity: byte * ReadOnlyMemory<byte> -> unit) = // tableIndex * entry
@@ -20,7 +21,7 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte * ReadOnlyMemo
     let writeBulk (bulk: BulkHeader) =
         use stream = _memoryManager.GetStream()
         
-        stream.WriteByte Constants.BulkRecord
+        stream.WriteByte Constants.BulkRecordTableIndex
         MessagePackSerializer.Serialize(writer = stream, value = bulk)
         
         let msg = stream.GetBuffer().AsSpan(0, int stream.Length)
@@ -100,12 +101,10 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte * ReadOnlyMemo
         return entity
     }
     
-    member this.CommitAsync() =
-        fasterLog.Commit(spinWait = true)
-        fasterLog.CommitAsync()        
+    member this.CommitAsync() = fasterLog.CommitAsync()        
     
-    member this.Restore() =
-        use iterator = fasterLog.Scan(fasterLog.BeginAddress, fasterLog.SafeTailAddress, name = null, recover = false)
+    member this.RestoreFrom(fromAddress) =
+        use iterator = fasterLog.Scan(fromAddress, fasterLog.SafeTailAddress, name = null, recover = false)
         
         let mutable entry: IMemoryOwner<byte> = null
         let mutable currentAddress = 0L
@@ -114,14 +113,17 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte * ReadOnlyMemo
         while iterator.GetNext(MemoryPool.Shared, &entry, &entryLength, &currentAddress) do
             use e = entry
             let tableIndex = entry.Memory.Span[0]             
-            if tableIndex <> Constants.BulkRecord then
+            if tableIndex <> Constants.BulkRecordTableIndex then
                 let logEntry = entry.Memory.Slice(1, entryLength - 1) // skip tableIndex
                 updateEntity(tableIndex, logEntry)            
     
-    interface IDisposable with
-        member this.Dispose() =
-            fasterLog.Commit(spinWait = true)
-            fasterLog.Dispose()            
+    interface IAsyncDisposable with
+        member this.DisposeAsync() =
+            valueTask {
+                do! fasterLog.CommitAsync()
+                fasterLog.Dispose()
+            }
+            |> ValueTask.toUnit
     
     static member Init(updateEntity) =
         let config = new FasterLogSettings("stereo_db", deleteDirOnDispose = false)

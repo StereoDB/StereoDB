@@ -27,8 +27,7 @@ type ReadWriteTsContextExt =
         table :?> IReadWriteTable<'TId, 'TEntity>
         
 type IStereoDb<'TSchema> =
-    inherit IDisposable
+    inherit IAsyncDisposable
     abstract ReadTransaction: transaction:Func<ReadOnlyTsContext<'TSchema>, 'T> -> 'T
     abstract WriteTransaction: transaction:Func<ReadWriteTsContext<'TSchema>, 'T> -> 'T
     abstract WriteTransaction: transaction:Action<ReadWriteTsContext<'TSchema>> -> unit
-    abstract CommitAsync: unit -> ValueTask

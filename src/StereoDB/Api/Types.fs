@@ -29,7 +29,7 @@ type ITable<'TId, 'TEntity> =
     inherit ITable
 
 type internal ITableControl =
-    abstract InitStorage:          StorageLog * EntityAddressStore -> unit
+    abstract SetStorage:           StorageLog * EntityAddressStore -> unit
     abstract UpdateEntity:         logEntry:ReadOnlyMemory<byte> -> unit
     abstract GetEntityAddress:     logEntry:ReadOnlyMemory<byte> * logAddress:int64 -> Result<EntityAddress,exn>
     abstract EnableChangeTracking: unit -> unit

@@ -22,6 +22,7 @@
 
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
+        <Compile Include="Constants.fs" />
         <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
         <Compile Include="Storage\StorageTypes.fs" />
