@@ -1,4 +1,4 @@
-﻿module StereoDB.Tests.UtilsTests
+﻿module Tests.UtilsTests
 
 open Xunit
 open Swensen.Unquote

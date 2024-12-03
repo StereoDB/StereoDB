@@ -8,8 +8,8 @@ open Tests.TestHelper
 open Xunit
 
 [<Fact>]
-let ``Update using other field`` () =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Update using other field`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -37,13 +37,14 @@ let ``Update using other field`` () =
     test <@ book1.Quantity = 1 @>
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 3 @>
+}
 
 [<Theory>]
 [<InlineData("UPDATE Books SET Quantity = 222 WHERE Id = 8")>]
 [<InlineData("UPDATE b SET Quantity = 222 FROM Books b WHERE b.Id = 8")>]
 [<InlineData("UPDATE Books SET Quantity = 222 FROM Books WHERE Id = 8")>]
-let ``Update with WHERE`` (sql) =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Update with WHERE`` (sql) = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -71,10 +72,11 @@ let ``Update with WHERE`` (sql) =
     test <@ book1.Quantity = 222 @>
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 1 @>
+}
 
 [<Fact>]
-let ``Update using other field for mutable record`` () =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Update using other field for mutable record`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -102,10 +104,11 @@ let ``Update using other field for mutable record`` () =
     test <@ book1.Quantity = 1 @>
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 3 @>
+}
 
 [<Fact>]
-let ``Update all rows in table`` () =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Update all rows in table`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -133,4 +136,5 @@ let ``Update all rows in table`` () =
     test <@ book1.Quantity = 2 @>
     let book2 = result.Value.Book2
     test <@ book2.Quantity = 2 @>
+}
 

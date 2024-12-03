@@ -37,7 +37,7 @@ class Schema : IDbSchema
 public class StereoDbBenchmark
 {
     private List<User> _allData;
-    private IStereoDb<Schema> _db = StereoDb.Create(new Schema(), StereoDbSettings.Default);
+    private IStereoDb<Schema> _db = null; 
     private Random _random = new();
 
     private Int64 CurrentDbWriteCount1 = 0;
@@ -54,6 +54,7 @@ public class StereoDbBenchmark
     [GlobalSetup]
     public void GlobalSetup()
     {
+        _db = StereoDb.Init(new Schema(), StereoDbSettings.OnlyInMemory).Result;
         _allData = DataGen.GenerateUsers(UsersCount);
 
         _db.WriteTransaction(ctx =>
@@ -62,7 +63,7 @@ public class StereoDbBenchmark
 
             foreach (var item in _allData)
             {
-                table.Set(item);
+                table.Set(item.Id, item);
             }
         });
     }
@@ -90,7 +91,7 @@ public class StereoDbBenchmark
                         var randomUser = _allData[index];
 
                         var table = ctx.UseTable(ctx.Schema.Users.Table);
-                        table.Set(randomUser);
+                        table.Set(randomUser.Id, randomUser);
                     });
 
                     Interlocked.Increment(ref CurrentDbWriteCount1);
@@ -136,7 +137,7 @@ public class StereoDbBenchmark
                         var randomUser = _allData[index];
 
                         var table = ctx.UseTable(ctx.Schema.Users.Table);
-                        table.Set(randomUser);
+                        table.Set(randomUser.Id, randomUser);
                     });
 
                     Interlocked.Increment(ref CurrentDbWriteCount2);

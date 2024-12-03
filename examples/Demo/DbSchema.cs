@@ -3,7 +3,6 @@
 using StereoDB;
 using StereoDB.CSharp;
 
-// defines a Book type that implements IEntity<TId>
 public record Book
 {
     public int Id { get; init; }
@@ -12,7 +11,6 @@ public record Book
     public int[] Categories { get; init; }
 }
 
-// defines an Order type that implements IEntity<TId>
 public record Order
 {
     public Guid Id { get; init; }

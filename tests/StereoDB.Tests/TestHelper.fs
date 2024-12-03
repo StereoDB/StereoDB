@@ -1,12 +1,14 @@
 ﻿module Tests.TestHelper
 
+open MessagePack
 open StereoDB
 open StereoDB.FSharp
 
+[<MessagePackObject>]
 type Book = {
-    Id: int
-    Title: string
-    Quantity: int
+    [<Key(0)>] Id: int
+    [<Key(1)>] Title: string
+    [<Key(2)>] Quantity: int
 }
         
 type Order = {
@@ -50,4 +52,13 @@ type Schema2() =
     
     interface IDbSchema with
         member this.AllTables = [_ordersTable]
+        
+type Schema3() =
+    
+    let _books = {| Table = StereoDb.createTable<int, Book>("books") |}
+    
+    member this.Books = _books
+    
+    interface IDbSchema with
+        member this.AllTables = [_books.Table]
 

@@ -9,8 +9,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Delete all rows in table`` () =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Delete all rows in table`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
 
     // add books
     db.WriteTransaction(fun ctx ->
@@ -35,14 +35,15 @@ let ``Delete all rows in table`` () =
     
     let allIdsCount = result.Value
     test <@ allIdsCount = 0 @>
+}
 
 [<Theory>]
 [<InlineData("DELETE FROM Books WHERE Id = 7")>]
 [<InlineData("DELETE Books WHERE Id = 7")>]
 [<InlineData("DELETE b FROM Books b WHERE Id = 7")>]
 [<InlineData("DELETE Books FROM Books WHERE Id = 7")>]
-let ``Delete rows from table by condition`` (sql) =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Delete rows from table by condition`` (sql) = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
 
     // add books
     db.WriteTransaction(fun ctx ->
@@ -71,4 +72,5 @@ let ``Delete rows from table by condition`` (sql) =
     
     let allIdsCount = result.Value
     test <@ allIdsCount = 9 @>
+}
 

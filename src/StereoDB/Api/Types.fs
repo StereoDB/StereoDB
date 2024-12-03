@@ -1,7 +1,15 @@
 ﻿namespace StereoDB
 
 open System
+open System.Buffers
+open System.Collections
 open System.Runtime.InteropServices
+open Serilog
+open StereoDB.Storage
+
+type IEntitySerializer =
+    abstract Serialize<'T>: writer:IBufferWriter<byte> * value:'T -> unit
+    abstract Deserialize<'T>: data:ReadOnlyMemory<byte> -> 'T
 
 type ISecondaryIndex = interface end
 
@@ -21,17 +29,29 @@ type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IC
 
 type ITable =
     abstract TableName: string
-    abstract TableIndex: int
+    abstract TableId: byte
 
 type ITable<'TId, 'TEntity> =
     inherit ITable
+
+type internal ITableControl =
+    abstract Init:                 ILogger -> unit
+    abstract SetStorage:           StorageLog * EntityAddressStore * IEntitySerializer -> unit
+    abstract UpdateEntity:         logEntry:ReadOnlyMemory<byte> -> unit
+    abstract GetEntityAddress:     logEntry:ReadOnlyMemory<byte> * logAddress:int64 -> Result<EntityAddress,exn>
+    abstract EnableChangeTracking: unit -> unit
+    abstract GetChangesAndReset:   unit -> IDictionary
+    abstract WriteToLog:           tableChanges:IDictionary -> unit
+    abstract ReturnChangesToPool:  tableChanges:IDictionary -> unit
     
 type IConfigurationTable<'TId, 'TEntity> =    
-    inherit ITable<'TId, 'TEntity>
+    inherit ITable<'TId, 'TEntity>    
     abstract AddValueIndex: getValue:Func<'TEntity, 'TValue> -> IValueIndex<'TValue, 'TEntity>    
+    
     abstract AddMultiValueIndex:
         getValues:Func<'TEntity, 'TValue seq> *
         [<Optional; DefaultParameterValue(false:bool)>] unsafeReindexByObjRefCompare:bool -> IValueIndex<'TValue, 'TEntity>        
+    
     abstract AddRangeScanIndex: getValue:Func<'TEntity, 'TValue> -> IRangeScanIndex<'TValue, 'TEntity>
 
 type IDbSchema =
