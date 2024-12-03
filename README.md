@@ -13,10 +13,11 @@ Supported features:
 - [x] Basic SQL support
 - [x] Transactions (read-only, read-write)
 - [x] Secondary Indexes
-  - [x] Value Index (hash-based index)
+  - [x] Value Index
+  - [x] MultiValue Index
   - [x] Range Scan Index
 - [ ] Data size larger than RAM
-- [ ] Data persistence
+- [x] Local file data persistence
 - [ ] Distributed mode
   - [ ] Server and client discovery
   - [ ] Range-based sharding
