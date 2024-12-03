@@ -1,83 +1,61 @@
 ﻿namespace StereoDB.Table
 
 open System
-open MessagePack
+open Serilog
 open StereoDB
-open StereoDB.Storage
+open StereoDB.Table.Domain
 
 type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality>(tableName) =
+     
+    let _changesPool = ChangesDictPool.createPool()
+    let _memData = TableOperations.createMemoryData tableName _changesPool
+    let _tableId = _memData.TableId
 
-    let mutable _storageLog: StorageLog option = None
-    let mutable _entityAddressStore: EntityAddressStore option = None
-    
-    let _memData = TableOperations.createMemData<'TId, 'TEntity> tableName
-    let _data = _memData.Data
-    let _tableIndex = _memData.TableIndex
-    
-    let _changesPool = Changes.createPool()
-    let _changeTracking = { Changes = Changes.rentDictForChanges _changesPool; IsEnabled = false }
-
-    let updateEntity (logEntry: ReadOnlyMemory<byte>) =
-        try
-            let mutable reader = MessagePackReader(logEntry)
-            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader)
-            if header.IsRemoved then
-                TableOperations.delete header.Id _changeTracking _memData |> ignore
-            else
-                let endPosition = reader.Position.GetInteger() - 1
-                let payload = logEntry.Slice endPosition                
-                let entity = MessagePackSerializer.Deserialize<'TEntity>(payload)                
-                TableOperations.set header.Id entity _changeTracking _memData
-        with
-            ex -> ()
-            
-    let getEntityAddress (logEntry: ReadOnlyMemory<byte>) (logAddress: int64) =
-        try
-            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(logEntry)
-            if header.IsRemoved then
-                Ok (EntityAddress.createRemoved (header.Id.ToString()) _tableIndex)
-            else
-                Ok (EntityAddress.create (header.Id.ToString()) _tableIndex logAddress)
-        with
-            ex -> Error ex            
+    let mutable _logger = Unchecked.defaultof<ILogger>    
+    let mutable _storageLog = None
+    let mutable _entityAddressStore = None
+    let mutable _entitySerializer = None
     
     let getChangesAndReset () =
-        if _changeTracking.Changes.Count > 0 then
-           let oldChanges = _changeTracking.Changes
-           _changeTracking.Changes <- Changes.rentDictForChanges _changesPool
+        if _memData.ChangeTracking.Changes.Count > 0 then
+           let oldChanges = _memData.ChangeTracking.Changes
+           _memData.ChangeTracking.Changes <- ChangesDictPool.rentDict _changesPool
            oldChanges :> Collections.IDictionary
         else
-           Changes.emptyDict
+           ChangesDictPool.emptyDict
     
     interface ITable with
         member this.TableName = tableName
-        member this.TableIndex = _tableIndex
+        member this.TableId = _tableId
         
     interface ITableControl with
-        member this.SetStorage(storageLog, entityAddressStore) =
+        member this.Init(logger) = _logger <- logger
+        
+        member this.SetStorage(storageLog, entityAddressStore, serializer) =
             _storageLog <- Some storageLog
             _entityAddressStore <- Some entityAddressStore
+            _entitySerializer <- Some serializer
             
-        member this.UpdateEntity(logEntry) = updateEntity logEntry
-        member this.GetEntityAddress(logEntry, logAddress) = getEntityAddress logEntry logAddress
+        member this.UpdateEntity(logEntry) = TableOperations.updateEntity _memData logEntry _entitySerializer.Value        
+        member this.GetEntityAddress(logEntry, logAddress) = TableOperations.getEntityAddress _tableId logEntry logAddress
         
-        member this.EnableChangeTracking()            = _changeTracking.IsEnabled <- true        
+        member this.EnableChangeTracking()            = _memData.ChangeTracking.IsEnabled <- true        
         member this.GetChangesAndReset()              = getChangesAndReset()
-        member this.WriteToLog(tableChanges)          = TableOperations.writeToLog<'TId,'TEntity> _tableIndex tableChanges _storageLog        
-        member this.ReturnChangesToPool(tableChanges) = Changes.returnChangesToPool _changesPool tableChanges                                           
+        member this.WriteToLog(tableChanges)          = TableOperations.writeToLog<'TId,'TEntity> _tableId tableChanges _storageLog        
+        member this.ReturnChangesToPool(tableChanges) = ChangesDictPool.returnDictToPool _changesPool tableChanges                                                   
         
     interface IConfigurationTable<'TId, 'TEntity> with        
-        member this.AddRangeScanIndex(getValue) = TableIndex.addRangeScanIndex _memData getValue
-        member this.AddValueIndex(getValue)     = TableIndex.addValueIndex _memData getValue
+        member this.AddRangeScanIndex(getValue) = SecondaryIndex.addRangeScanIndex _memData getValue
+        member this.AddValueIndex(getValue)     = SecondaryIndex.addValueIndex _memData getValue
         
         member this.AddMultiValueIndex(getValue, unsafeReindexByObjRefCompare) =
-            TableIndex.addMultiValueIndex _memData getValue unsafeReindexByObjRefCompare        
+            SecondaryIndex.addMultiValueIndex _memData getValue unsafeReindexByObjRefCompare        
         
     interface CSharp.IReadOnlyTable<'TId, 'TEntity> with        
-        member this.GetIds() = TableOperations.getIds _data
+        member this.GetIds() = TableOperations.getIds _memData.Data
         
         member this.TryGet(id, entity) =
-            match TableOperations.get id _data with
+            match TableOperations.get id _memData.Data with
             | ValueSome v ->
                 entity <- v
                 true
@@ -85,13 +63,13 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
             | ValueNone -> false
     
     interface CSharp.IReadWriteTable<'TId, 'TEntity> with        
-        member this.Set(id, entity) = TableOperations.set id entity _changeTracking _memData        
-        member this.Delete(id) = TableOperations.delete id _changeTracking _memData
+        member this.Set(id, entity) = TableOperations.set id entity _memData        
+        member this.Delete(id) = TableOperations.delete id _memData
         
     interface FSharp.IReadOnlyTable<'TId, 'TEntity> with        
-        member this.GetIds() = TableOperations.getIds _data                          
-        member this.Get(id) = TableOperations.get id _data        
+        member this.GetIds() = TableOperations.getIds _memData.Data                          
+        member this.Get(id) = TableOperations.get id _memData.Data
         
     interface FSharp.IReadWriteTable<'TId, 'TEntity> with        
-        member this.Set(id, entity) = TableOperations.set id entity _changeTracking _memData         
-        member this.Delete(id) = TableOperations.delete id _changeTracking _memData
+        member this.Set(id, entity) = TableOperations.set id entity _memData         
+        member this.Delete(id) = TableOperations.delete id _memData

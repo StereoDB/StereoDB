@@ -1,8 +1,12 @@
 ﻿module internal StereoDB.Infra.Utils
 
+open System
 open System.Collections.Generic
 open MessagePack
 open MessagePack.Resolvers
+
+let inline disposeAsync instance =
+    (instance :> IAsyncDisposable).DisposeAsync()
 
 module DeterministicHash =
     
@@ -31,8 +35,17 @@ module Array =
             array[index] <- ch.Value
             index <- index + 1
             
+module Seq =
+    
+    let tryHeadV (source: seq<_>) =        
+        use e = source.GetEnumerator()
+
+        if e.MoveNext() then
+            ValueSome e.Current
+        else
+            ValueNone
+            
 module MessagePack =
     
-    let initDefaultOptions () =
-        let options = MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)
-        MessagePackSerializer.DefaultOptions <- options
+    let defaultOptions =
+        MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)

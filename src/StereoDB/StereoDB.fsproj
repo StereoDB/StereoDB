@@ -8,6 +8,7 @@
         <Company>StereoDB</Company>
         <Version>0.4.0</Version>
         <Copyright>StereoDB@2024</Copyright>
+        <Nullable>enable</Nullable>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -26,6 +27,7 @@
         <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
         <Compile Include="Storage\StorageTypes.fs" />
+        <Compile Include="Storage\Sqlite.fs" />
         <Compile Include="Storage\StorageLog.fs" />        
         <Compile Include="Storage\EntityAddressStore.fs" />        
         <Compile Include="Api\Types.fs" />        
@@ -50,7 +52,8 @@
         <PackageReference Include="MessagePack" Version="2.5.192" />
         <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />        
         <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
-        <PackageReference Include="RepoDb.Sqlite.Microsoft" Version="1.13.1" />        
+        <PackageReference Include="RepoDb.Sqlite.Microsoft" Version="1.13.1" />
+        <PackageReference Include="Serilog" Version="4.1.0" />
         <PackageReference Include="System.Threading.Channels" Version="9.0.0" />        
     </ItemGroup>
 

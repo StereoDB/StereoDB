@@ -25,23 +25,24 @@ type internal ChangedRecord<'TId, 'TEntity> = {
 
 type EntityAddress = {
     Id: string
-    TableIndex: byte
+    TableId: byte
     Address: int64
 }
 
+// todo: optimise string allocation
 module internal EntityAddress =
-    
+        
     let inline getCompositeKey (record: EntityAddress) =
-        $"{record.Id}-{record.TableIndex}"
+        $"{record.Id}-{record.TableId}"
         
     let inline isRemoved (record: EntityAddress) =
         record.Address = 0
         
-    let inline createRemoved id tableIndex =
-        { Id = id; TableIndex = tableIndex; Address = 0 }
+    let inline createRemoved id tableId =
+        { Id = id.ToString(); TableId = tableId; Address = 0 }
         
-    let inline create id tableIndex address =
-        { Id = id; TableIndex = tableIndex; Address = address }
+    let inline create id tableId address =
+        { Id = id.ToString(); TableId = tableId; Address = address }
         
     let inline getMaxAddress (addresses: EntityAddress seq) =
         addresses |> Seq.maxBy(_.Address)

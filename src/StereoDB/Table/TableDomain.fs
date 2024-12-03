@@ -1,45 +1,44 @@
-﻿namespace StereoDB.Table
+﻿module internal StereoDB.Table.Domain
 
 open System
-open System.Buffers
 open System.Collections.Concurrent
 open System.Collections.Generic
-open System.Threading.Tasks
-open Microsoft.IO
+open MessagePack
 open StereoDB
 open StereoDB.Infra.Utils
 open StereoDB.SecondaryIndex
 open StereoDB.Storage
 
-type internal TableRecord<'TEntity> = {
+type TableRecord<'TEntity> = {
     mutable Entity: 'TEntity
     mutable IsEmpty: bool
 }
 
-type internal MemoryData<'TId, 'TEntity> = {
-    TableIndex: byte
-    Data: Dictionary<'TId, TableRecord<'TEntity>>
-    Indexes: ResizeArray<ISecondaryIndex<'TId, 'TEntity>>
-}
-
-type internal ChangeTracking<'TId,'TEntity> = {
+type ChangeTracking<'TId,'TEntity> = {
     mutable Changes: Dictionary<'TId, ChangedRecord<'TId,'TEntity>>
     mutable IsEnabled: bool
 }
 
-module internal Changes =
+type MemoryData<'TId,'TEntity> = {    
+    TableId: byte
+    Data: Dictionary<'TId, TableRecord<'TEntity>>
+    Indexes: ResizeArray<ISecondaryIndex<'TId,'TEntity>>
+    ChangeTracking: ChangeTracking<'TId,'TEntity>    
+}
+
+module ChangesDictPool =
     
     let emptyDict = Dictionary<byte,byte>()  
     
     let createPool () =
         ConcurrentQueue<Dictionary<'TId, ChangedRecord<'TId,'TEntity>>>()
 
-    let rentDictForChanges (pool: ConcurrentQueue<Dictionary<'TId, ChangedRecord<'TId,'TEntity>>>) =
+    let rentDict (pool: ConcurrentQueue<Dictionary<'TId, ChangedRecord<'TId,'TEntity>>>) =
         match pool.TryDequeue() with
         | true, v  -> v
         | false, _ -> Dictionary<'TId, ChangedRecord<'TId,'TEntity>>()
         
-    let returnChangesToPool
+    let returnDictToPool
         (pool: ConcurrentQueue<Dictionary<'TId, ChangedRecord<'TId,'TEntity>>>)
         (changes: Collections.IDictionary) =
         
@@ -47,12 +46,19 @@ module internal Changes =
             changes.Clear()            
             pool.Enqueue(changes :?> Dictionary<'TId, ChangedRecord<'TId,'TEntity>>)        
     
-module internal TableOperations =
+module TableOperations =
     
-    let createMemData<'TId, 'TEntity when 'TId: equality> tableName =
-        { TableIndex = tableName |> DeterministicHash.strToHash |> DeterministicHash.mapToByte |> DeterministicHash.castToNotReservedBytes
-          Data = Dictionary<'TId, TableRecord<'TEntity>>()
-          Indexes = ResizeArray<ISecondaryIndex<'TId,'TEntity>>() }
+    let parseTableId tableName =
+        tableName |> DeterministicHash.strToHash |> DeterministicHash.mapToByte |> DeterministicHash.castToNotReservedBytes
+    
+    let createMemoryData tableName changesDictPool =
+        let tableId = parseTableId tableName        
+        let _changeTracking = { Changes = ChangesDictPool.rentDict changesDictPool; IsEnabled = false }
+        
+        { TableId = tableId
+          Data = Dictionary()
+          Indexes = ResizeArray()
+          ChangeTracking = _changeTracking }
     
     let inline getIds (data: Dictionary<'TId,TableRecord<'TEntity>>) =
         data.Keys |> Seq.map id 
@@ -62,9 +68,7 @@ module internal TableOperations =
         | true, v  -> ValueSome v.Entity
         | false, _ -> ValueNone
         
-    let set id entity
-        (changeTracking: ChangeTracking<'TId,'TEntity>)
-        (memData: MemoryData<'TId,'TEntity>) =
+    let set id entity (memData: MemoryData<'TId,'TEntity>) =
         
         match memData.Data.TryGetValue id with
         | true, oldRecord ->
@@ -75,8 +79,8 @@ module internal TableOperations =
             oldRecord.IsEmpty <- false
             memData.Data[id] <- oldRecord
             
-            if changeTracking.IsEnabled then
-                changeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
+            if memData.ChangeTracking.IsEnabled then
+                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
         
         | _ ->
             for index in memData.Indexes do
@@ -84,36 +88,60 @@ module internal TableOperations =
                 
             memData.Data[id] <- { Entity = entity; IsEmpty = false }
             
-            if changeTracking.IsEnabled then
-                changeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
+            if memData.ChangeTracking.IsEnabled then
+                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
                 
-    let delete id
-        (changeTracking: ChangeTracking<'TId,'TEntity>)
-        (memData: MemoryData<'TId,'TEntity>) =            
+    let delete id (memData: MemoryData<'TId,'TEntity>) =            
         
         match memData.Data.TryGetValue id with
         | true, record ->                
             for index in memData.Indexes do
                 index.RemoveFromIndex(id, record.Entity)                
         
-            if changeTracking.IsEnabled then
-                changeTracking.Changes[id] <- { Id = id; Entity = Unchecked.defaultof<_>; IsRemoved = true }
+            if memData.ChangeTracking.IsEnabled then
+                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = Unchecked.defaultof<_>; IsRemoved = true }
         
         | false, _ -> ()        
         
         memData.Data.Remove id
         
-    let writeToLog<'TId,'TEntity> tableIndex (tableChanges: Collections.IDictionary) (storage: StorageLog option) =
+    let writeToLog<'TId,'TEntity> tableId (tableChanges: Collections.IDictionary) (storage: StorageLog option) =
         match storage with
         | Some store when tableChanges.Count > 0 ->            
             let tableChanges = tableChanges :?> Dictionary<'TId, ChangedRecord<'TId,'TEntity>>
             store.WriteStartBulk()                
-            let recordsCount = store.WriteTableChanges(tableIndex, tableChanges)                
+            let recordsCount = store.WriteTableChanges(tableId, tableChanges)                
             store.WriteEndBulk recordsCount            
         
         | _ -> ()
         
-module internal TableIndex =
+    let updateEntity (memData: MemoryData<'TId, 'TEntity>)
+                     (logEntry: ReadOnlyMemory<byte>)
+                     (entitySerializer: IEntitySerializer) =        
+        try
+            let mutable reader = MessagePackReader(logEntry)
+            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader, MessagePack.defaultOptions)
+            if header.IsRemoved then
+                delete header.Id memData |> ignore
+            else
+                let endPosition = reader.Position.GetInteger() - 1
+                let payload = logEntry.Slice endPosition                
+                let entity = entitySerializer.Deserialize<'TEntity>(payload)                
+                set header.Id entity memData
+        with
+            ex -> ()
+            
+    let getEntityAddress<'TId> tableId (logEntry: ReadOnlyMemory<byte>) logAddress =
+        try
+            let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(logEntry, MessagePack.defaultOptions)
+            if header.IsRemoved then
+                Ok (EntityAddress.createRemoved header.Id tableId)
+            else
+                Ok (EntityAddress.create header.Id tableId logAddress)
+        with
+            ex -> Error ex            
+        
+module SecondaryIndex =
     
     let addValueIndex (memData: MemoryData<'TId, 'TEntity>) (getValue: Func<'TEntity, 'TValue>) =
         let index = ValueIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)            

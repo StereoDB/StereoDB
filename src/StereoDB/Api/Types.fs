@@ -1,9 +1,16 @@
 ﻿namespace StereoDB
 
 open System
+open System.Buffers
 open System.Collections
 open System.Runtime.InteropServices
+open Serilog
 open StereoDB.Storage
+
+[<AllowNullLiteral>]
+type IEntitySerializer =
+    abstract Serialize<'T>: writer:IBufferWriter<byte> * value:'T -> unit
+    abstract Deserialize<'T>: data:ReadOnlyMemory<byte> -> 'T
 
 type ISecondaryIndex = interface end
 
@@ -23,13 +30,14 @@ type IRangeScanIndex<'TValue, 'TEntity when 'TValue : equality and 'TValue :> IC
 
 type ITable =
     abstract TableName: string
-    abstract TableIndex: byte
+    abstract TableId: byte
 
 type ITable<'TId, 'TEntity> =
     inherit ITable
 
 type internal ITableControl =
-    abstract SetStorage:           StorageLog * EntityAddressStore -> unit
+    abstract Init:                 ILogger -> unit
+    abstract SetStorage:           StorageLog * EntityAddressStore * IEntitySerializer -> unit
     abstract UpdateEntity:         logEntry:ReadOnlyMemory<byte> -> unit
     abstract GetEntityAddress:     logEntry:ReadOnlyMemory<byte> * logAddress:int64 -> Result<EntityAddress,exn>
     abstract EnableChangeTracking: unit -> unit
