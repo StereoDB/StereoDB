@@ -37,7 +37,7 @@ class Schema : IDbSchema
 public class StereoDbBenchmark
 {
     private List<User> _allData;
-    private IStereoDb<Schema> _db = StereoDb.Create(new Schema(), StereoDbSettings.Default);
+    private IStereoDb<Schema> _db = null; 
     private Random _random = new();
 
     private Int64 CurrentDbWriteCount1 = 0;
@@ -54,6 +54,7 @@ public class StereoDbBenchmark
     [GlobalSetup]
     public void GlobalSetup()
     {
+        _db = StereoDb.Init(new Schema(), StereoDbSettings.OnlyInMemory).Result;
         _allData = DataGen.GenerateUsers(UsersCount);
 
         _db.WriteTransaction(ctx =>
