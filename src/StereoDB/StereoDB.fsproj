@@ -26,7 +26,7 @@
         <Compile Include="Constants.fs" />
         <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
-        <Compile Include="Storage\StorageTypes.fs" />
+        <Compile Include="Storage\StorageDomain.fs" />
         <Compile Include="Storage\Sqlite.fs" />
         <Compile Include="Storage\StorageLog.fs" />        
         <Compile Include="Storage\EntityAddressStore.fs" />        

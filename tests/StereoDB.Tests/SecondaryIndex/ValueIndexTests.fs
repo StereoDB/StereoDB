@@ -10,8 +10,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Find should work correctly`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Find should work correctly`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -40,10 +40,11 @@ let ``Find should work correctly`` () =
         ValueNone
     )
     |> ignore
+}
     
 [<Fact>]
-let ``ValueIndex should handle deletion`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``ValueIndex should handle deletion`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -70,10 +71,11 @@ let ``ValueIndex should handle deletion`` () =
         test <@ book1.Length = 1 @>
         test <@ book3.Length = 1 @>
     )
+}
     
 [<Fact>]
-let ``ValueIndex should handle reindexing`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``ValueIndex should handle reindexing`` () = task {    
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -103,3 +105,4 @@ let ``ValueIndex should handle reindexing`` () =
         test <@ book3.Length = 1 @>
         test <@ book50.Length = 1 @>
     )
+}

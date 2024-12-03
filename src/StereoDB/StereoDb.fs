@@ -15,16 +15,21 @@ open StereoDB.Infra.Utils
 type StereoDbSettings = {
     LocalPersistenceEnabled: bool
     EntitySerializer: IEntitySerializer
+    DbFolderPath: string
 }
 with
     static member OnlyInMemory = {
         LocalPersistenceEnabled = false
-        EntitySerializer = null
+        EntitySerializer = Unchecked.defaultof<_>
+        DbFolderPath = ""
     }
     
-    static member WithMsgPackFileStorage([<Optional; DefaultParameterValue(null:MessagePackSerializerOptions)>]
-                                         options: MessagePackSerializerOptions) = {
+    static member FileStorageMsgPack(
+        [<Optional; DefaultParameterValue(null:MessagePackSerializerOptions)>] options: MessagePackSerializerOptions,
+        [<Optional; DefaultParameterValue("":string)>] dbFolderPath: string) = {
+        
         LocalPersistenceEnabled = true
+        DbFolderPath = dbFolderPath
         EntitySerializer = {
             new IEntitySerializer with
                 member this.Serialize(writer, value) = MessagePackSerializer.Serialize(writer, value, options)
@@ -121,9 +126,10 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     member this.InitDb() = valueTask {
         _allTables |> Array.iter(fun x -> x.Init logger)
         
-        if settings.LocalPersistenceEnabled then            
-            let storageLog   = StorageLog.Init updateEntity
-            let addressStore = EntityAddressStore.Init(storageLog.FasterLog, getEntityAddress, updateEntity)
+        if settings.LocalPersistenceEnabled then
+            let dbPath = StorageOperations.createDbFilePath settings.DbFolderPath
+            let storageLog   = StorageLog.Init(dbPath.DbLogFolder, updateEntity)
+            let addressStore = EntityAddressStore.Init(dbPath.SqliteDbPath, storageLog.FasterLog, getEntityAddress, updateEntity)
             
             _storageLog         <- Some storageLog
             _entityAddressStore <- Some addressStore
@@ -196,14 +202,15 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     interface IAsyncDisposable with
         member this.DisposeAsync() =
             valueTask {
-                _working <- false // todo: working set true and via transaction, also validate via transaction
-                
-                if _storageLog.IsSome then
-                    _currentCommitCancelToken.Cancel()
-                    _currentCheckpointCancelToken.Cancel()
-                    do! Task.WhenAll(_currentCommitTask, _currentCheckpointTask)                    
-                    do! disposeAsync _entityAddressStore.Value
-                    do! disposeAsync _storageLog.Value
+                if _working then
+                    _working <- false // todo: working set true and via transaction, also validate via transaction
+                    
+                    if _storageLog.IsSome then
+                        _currentCommitCancelToken.Cancel()
+                        _currentCheckpointCancelToken.Cancel()
+                        do! Task.WhenAll(_currentCommitTask, _currentCheckpointTask)                    
+                        do! disposeAsync _entityAddressStore.Value
+                        do! disposeAsync _storageLog.Value
             }
             |> ValueTask.toUnit                
 
@@ -212,6 +219,7 @@ namespace StereoDB.CSharp
     open IcedTasks
     open Serilog
     open StereoDB
+    open StereoDB.Storage
     open StereoDB.Table
     
     type StereoDb =
@@ -222,22 +230,19 @@ namespace StereoDB.CSharp
             return db :> IStereoDb<_>
         }
         
+        static member Remove(settings) = 
+            StorageOperations.removeDb settings.DbFolderPath
+        
         static member CreateTable(tableName) =
             StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>            
             
 namespace StereoDB.FSharp
 
     open IcedTasks
-    open System.Runtime.CompilerServices
     open Serilog
     open StereoDB
+    open StereoDB.Storage
     open StereoDB.Table
-    
-    type StereoDbExtensions =
-    
-        [<Extension>]
-        static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
-            table.Set(entity.Id, entity)
     
     module StereoDb =
         
@@ -247,6 +252,9 @@ namespace StereoDB.FSharp
             do! db.InitDb()
             return db :> IStereoDb<_>
         }
+        
+        let remove settings =
+            StorageOperations.removeDb settings.DbFolderPath
         
         let createTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equality> (tableName) =
             StereoDbTable<'TId, 'TEntity>(tableName) :> IConfigurationTable<_, _>

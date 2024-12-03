@@ -1,32 +1,21 @@
 ﻿namespace Demo;
 
-using MessagePack;
 using StereoDB;
 using StereoDB.CSharp;
 
-public class EntityAddress
-{
-    public string Id { get; set; }
-    public string Name { get; set; }
-    public int Age { get; set; }
-    public DateTime CreatedDateUtc { get; set; }
-}
-
-[MessagePackObject]
 public record Book
 {
-    [Key(0)] public int Id { get; init; }
-    [Key(1)] public string Title { get; init; }
-    [Key(2)] public int Quantity { get; init; }
-    [Key(3)] public int[] Categories { get; init; }
+    public int Id { get; init; }
+    public string Title { get; init; }
+    public int Quantity { get; init; }
+    public int[] Categories { get; init; }
 }
 
-[MessagePackObject]
 public record Order
 {
-    [Key(0)] public Guid Id { get; init; }
-    [Key(1)] public int BookId { get; init; }
-    [Key(2)] public int Quantity { get; init; }
+    public Guid Id { get; init; }
+    public int BookId { get; init; }
+    public int Quantity { get; init; }
 }
 
 public class BooksSchema

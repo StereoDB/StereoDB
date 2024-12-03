@@ -46,10 +46,11 @@ type internal EntityAddressStore(fasterLog: FasterLog,
             else
                 for address in addresses do
                     let! memoryOwner, length = fasterLog.ReadAsync(address.Address, MemoryPool.Shared)
-                    let tableId = memoryOwner.Memory.Span[0]
-                    let logEntry = memoryOwner.Memory.Slice(1, length - 1) // skip tableIndex
-                    updateEntity tableId logEntry
-                    _latestSavedAddress <- address.Address
+                    if length > 0 then
+                        let tableId = memoryOwner.Memory.Span[0]
+                        let logEntry = memoryOwner.Memory.Slice(1, length - 1) // skip tableIndex
+                        updateEntity tableId logEntry
+                        _latestSavedAddress <- address.Address
             
             pageNumber <- pageNumber + 1
             
@@ -98,10 +99,10 @@ type internal EntityAddressStore(fasterLog: FasterLog,
             }
             |> ValueTask.toUnit
             
-    static member Init(fasterLog, getEntityAddress, updateEntity) =
+    static member Init(sqliteDbPath, fasterLog, getEntityAddress, updateEntity) =
         GlobalConfiguration.Setup().UseSqlite() |> ignore
         
-        let connection = new SqliteConnection(Sqlite.Query.ConnectionString)
+        let connection = new SqliteConnection(Sqlite.Query.createConnectionString sqliteDbPath)
         Sqlite.execCommand connection Sqlite.Query.CreateEntityAddressTable
         Sqlite.execCommand connection Sqlite.Query.OptimizationSetup
         

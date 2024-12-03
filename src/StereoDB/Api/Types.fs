@@ -7,7 +7,6 @@ open System.Runtime.InteropServices
 open Serilog
 open StereoDB.Storage
 
-[<AllowNullLiteral>]
 type IEntitySerializer =
     abstract Serialize<'T>: writer:IBufferWriter<byte> * value:'T -> unit
     abstract Deserialize<'T>: data:ReadOnlyMemory<byte> -> 'T

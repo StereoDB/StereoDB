@@ -85,21 +85,35 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte -> ReadOnlyMem
         writeBulk endBulk |> ignore
     
     member this.WriteTableChanges(tableId, tableChanges: Dictionary<'TId, ChangedRecord<'TId, 'TEntity>>) =        
-        writeTableChanges tableId tableChanges
-        // writeTableChangesSingleThreaded tableId tableChanges
+        // writeTableChanges tableId tableChanges
+        writeTableChangesSingleThreaded tableId tableChanges
         
-    member this.Read<'TId,'TEntity>(logAddress) = valueTask {
-        let! memoryOwner, ln = fasterLog.ReadAsync(logAddress, MemoryPool.Shared)        
+    // member this.Read<'TId,'TEntity>(logAddress) = valueTask {
+    //     let! memoryOwner, ln = fasterLog.ReadAsync(logAddress, MemoryPool.Shared)        
+    //     
+    //     let mutable reader = MessagePackReader(memoryOwner.Memory.Slice(1)) // skip tableId       
+    //     let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader, options = MessagePack.defaultOptions)
+    //     
+    //     //todo: check how to read only body, maybe reader.Skip()        
+    //     let endPosition = reader.Position.GetInteger()
+    //     let payload = memoryOwner.Memory.Slice endPosition
+    //     let entity = MessagePackSerializer.Deserialize<'TEntity>(payload, options = MessagePack.defaultOptions)
+    //     return entity
+    // }
+    
+    member this.RestoreFrom(fromAddress) =        
+        use iterator = fasterLog.Scan(fromAddress, fasterLog.TailAddress, name = null, recover = false)
         
-        let mutable reader = MessagePackReader(memoryOwner.Memory.Slice(1)) // skip tableId       
-        let header = MessagePackSerializer.Deserialize<RecordHeader<'TId>>(&reader, options = MessagePack.defaultOptions)
+        let mutable entry: IMemoryOwner<byte> = Unchecked.defaultof<_>
+        let mutable currentAddress = 0L
+        let mutable entryLength = 0
         
-        //todo: check how to read only body, maybe reader.Skip()        
-        let endPosition = reader.Position.GetInteger()
-        let payload = memoryOwner.Memory.Slice endPosition
-        let entity = MessagePackSerializer.Deserialize<'TEntity>(payload, options = MessagePack.defaultOptions)
-        return entity
-    }
+        while iterator.GetNext(MemoryPool.Shared, &entry, &entryLength, &currentAddress) do
+            use e = entry
+            let tableId = entry.Memory.Span[0]             
+            if tableId <> Constants.BulkRecordTableId then
+                let logEntry = entry.Memory.Slice(1, entryLength - 1) // skip tableIndex
+                updateEntity tableId logEntry  
     
     member this.CommitAsync() =
         fasterLog.CommitAsync()        
@@ -107,20 +121,6 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte -> ReadOnlyMem
     member this.TruncateUntil(fromAddress) =
         fasterLog.TruncateUntilPageStart(fromAddress)
         fasterLog.CommitAsync()
-    
-    member this.RestoreFrom(fromAddress) =
-        use iterator = fasterLog.Scan(fromAddress, fasterLog.TailAddress, name = null, recover = false)
-        
-        let mutable entry: IMemoryOwner<byte> = Unchecked.defaultof<_>
-        let mutable currentAddress = 0L
-        let mutable entryLength = 0        
-        
-        while iterator.GetNext(MemoryPool.Shared, &entry, &entryLength, &currentAddress) do
-            use e = entry
-            let tableId = entry.Memory.Span[0]             
-            if tableId <> Constants.BulkRecordTableId then
-                let logEntry = entry.Memory.Slice(1, entryLength - 1) // skip tableIndex
-                updateEntity tableId logEntry            
     
     interface IAsyncDisposable with
         member this.DisposeAsync() =
@@ -130,7 +130,7 @@ type internal StorageLog(fasterLog: FasterLog, updateEntity: byte -> ReadOnlyMem
             }
             |> ValueTask.toUnit
             
-    static member Init(updateEntity) =
-        let config = new FasterLogSettings("stereo_db", deleteDirOnDispose = false)
+    static member Init(dbLogFolder, updateEntity) =        
+        let config = new FasterLogSettings(dbLogFolder, deleteDirOnDispose = false)
         let fasterLog = new FasterLog(config)
         StorageLog(fasterLog, updateEntity)

@@ -2,6 +2,8 @@
 
 open System
 
+let [<Literal>] DbFileName = "stereo_db" 
+
 let [<Literal>] BulkRecordTableId = 0uy
 
 let [<Literal>] LoadAddressPullBatchSize = 100 // how many records we pull from Sqlite per query

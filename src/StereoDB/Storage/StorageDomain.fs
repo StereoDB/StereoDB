@@ -1,7 +1,9 @@
 ﻿namespace StereoDB.Storage
 
+open System.IO
 open System.Runtime.CompilerServices
 open MessagePack
+open StereoDB
 
 [<MessagePackObject; Struct; IsReadOnly>]
 type internal BulkHeader = {
@@ -46,3 +48,17 @@ module internal EntityAddress =
         
     let inline getMaxAddress (addresses: EntityAddress seq) =
         addresses |> Seq.maxBy(_.Address)
+        
+module internal StorageOperations =
+
+    let createDbFilePath dbFolder =
+        let dbLogFolder = Path.Combine(dbFolder, $"{Constants.DbFileName}_log")
+        let sqliteDb = Path.Combine(dbLogFolder, $"{Constants.DbFileName}_sqlite")
+        {| DbLogFolder = dbLogFolder; SqliteDbPath = sqliteDb |}
+        
+    let removeDb dbFolder =
+        try
+            let filePath = createDbFilePath dbFolder        
+            Directory.Delete(filePath.DbLogFolder, recursive = true)
+        with
+            ex -> ()            

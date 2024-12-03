@@ -9,12 +9,12 @@ module internal Sqlite =
     
     module Query =
     
-        let [<Literal>] ConnectionString = "Data Source=stereo_db_sqlite;"    
+        let createConnectionString dbPath = $"Data Source={dbPath};"    
     
         let [<Literal>] OptimizationSetup = "PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 6144000;"
         
         let [<Literal>] CreateEntityAddressTable =
-            $"""
+            """
                 CREATE TABLE IF NOT EXISTS EntityAddress (
                     Id TEXT NOT NULL,
                     TableId INTEGER NOT NULL,
@@ -42,8 +42,11 @@ module internal Sqlite =
             let rowsUpdated = connection.MergeAll(forUpsert, transaction = transaction)
             
             if not (Seq.isEmpty forDelete) then
-                let rowsDeleted = connection.Delete<EntityAddress>(forDelete, transaction = transaction)
-                ignore rowsDeleted
+                try
+                    let rowsDeleted = connection.DeleteAll<EntityAddress>(forDelete, transaction = transaction)
+                    ignore rowsDeleted
+                with
+                    ex -> ()
                 
             transaction.Commit()
             Ok ()

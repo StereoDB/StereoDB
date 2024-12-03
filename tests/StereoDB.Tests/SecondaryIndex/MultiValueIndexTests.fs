@@ -10,8 +10,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Find should work correctly`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``Find should work correctly`` () = task {    
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -41,10 +41,11 @@ let ``Find should work correctly`` () =
         ValueNone
     )
     |> ignore
+}
     
 [<Fact>]
-let ``MultiValueIndex should handle deletion`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``MultiValueIndex should handle deletion`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -71,10 +72,11 @@ let ``MultiValueIndex should handle deletion`` () =
         test <@ category2.Length = 2 @>
         test <@ category3.Length = 0 @>
     )
+}
     
 [<Fact>]
-let ``MultiValueIndex should handle reindexing`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``MultiValueIndex should handle reindexing`` () = task {    
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -104,10 +106,11 @@ let ``MultiValueIndex should handle reindexing`` () =
         test <@ category3.Length = 0 @>
         test <@ category4.Length = 1 @>
     )
+}
     
 [<Fact>]
-let ``MultiValueIndex should support reindexing by hash comparison`` () =    
-    let db = StereoDb.create(Schema2(), StereoDbSettings.Default)
+let ``MultiValueIndex should support reindexing by hash comparison`` () = task {    
+    use! db = StereoDb.init(Schema2(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -135,4 +138,5 @@ let ``MultiValueIndex should support reindexing by hash comparison`` () =
         
         test <@ category2.Length = 2 @>
         test <@ category5.Length = 1 @>        
-    )              
+    )
+}             

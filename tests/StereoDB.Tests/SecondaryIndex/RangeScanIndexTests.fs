@@ -10,8 +10,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``RangeScanIndex SelectRange should work correctly`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``RangeScanIndex SelectRange should work correctly`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -39,10 +39,11 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(1, 10) |> Seq.toArray
         test <@ data.Length = 3 @>
     )
+}
     
 [<Fact>]
-let ``RangeScanIndex remove from index should work correctly`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``RangeScanIndex remove from index should work correctly`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -92,10 +93,11 @@ let ``RangeScanIndex remove from index should work correctly`` () =
         test <@ data[1].Quantity = 5 @>
         test <@ data[2].Quantity = 10 @>
     )
+}
     
 [<Fact>]
-let ``RangeScanIndex should support reindex`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``RangeScanIndex should support reindex`` () = task {   
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     db.WriteTransaction(fun ctx ->
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
@@ -122,3 +124,4 @@ let ``RangeScanIndex should support reindex`` () =
         test <@ data.Length = 2 @>
         test <@ data[1].Quantity = 100 @>            
     )
+}

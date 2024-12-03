@@ -9,8 +9,8 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``Get and Set operations should work correctly`` () =    
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)   
+let ``Get and Set operations should work correctly`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)   
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -58,10 +58,11 @@ let ``Get and Set operations should work correctly`` () =
     test <@ book.Quantity = 0 @>
     test <@ orders[0].Quantity = 1 @>
     test <@ orders[0].BookId = book.Id @>
+}
     
 [<Fact>]
-let ``GetIds should be supported`` () =
-    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+let ``GetIds should be supported`` () = task {
+    use! db = StereoDb.init(Schema(), StereoDbSettings.OnlyInMemory)
     
     // add books
     db.WriteTransaction(fun ctx ->
@@ -84,3 +85,4 @@ let ``GetIds should be supported`` () =
     let ids = result.Value
     
     test <@ ids.Length = 10 @>
+}

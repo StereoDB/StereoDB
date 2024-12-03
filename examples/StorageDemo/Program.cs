@@ -1,11 +1,8 @@
-﻿using Demo;
-using StereoDB;
+﻿using StereoDB;
 using StereoDB.CSharp;
+using StorageDemo;
 
-await using var db = await StereoDb.Init(new Schema(), StereoDbSettings.OnlyInMemory);
-
-// 1) adds book
-// WriteTransaction: it's a read-write transaction: we can query and mutate data
+await using var db = await StereoDb.Init(new Schema(), StereoDbSettings.FileStorageMsgPack(dbFolderPath: "my_db"));
 
 db.WriteTransaction(ctx =>
 {
@@ -13,13 +10,10 @@ db.WriteTransaction(ctx =>
 
     foreach (var id in Enumerable.Range(0, 10))
     {
-        var book = new Book { Id = id, Title = $"book_{id}", Quantity = 1, Categories = [ 1, 2 ] };
+        var book = new Book { Id = id, Title = $"book_{id}", Quantity = 1 };
         books.Set(book.Id, book);
     }
 });
-
-// 2) creates an order
-// WriteTransaction: it's a read-write transaction: we can query and mutate data
 
 db.WriteTransaction(ctx =>
 {
@@ -39,21 +33,17 @@ db.WriteTransaction(ctx =>
     }
 });
 
-// 3) query book and orders
-// ReadTransaction: it's a read-only transaction: we can query multiple tables at once
+// Closing database - it triggers a commit on the disk
+// StereoDB also executes periodic auto-commit
+await db.DisposeAsync();
 
-var result = db.ReadTransaction(ctx =>
+// Opens a database and restore data from the disk
+await using var db2 = await StereoDb.Init(new Schema(), StereoDbSettings.FileStorageMsgPack());
+
+var result = db2.ReadTransaction(ctx =>
 {
     var books = ctx.UseTable(ctx.Schema.Books.Table);
-    var categoryIndex = ctx.Schema.Books.CategoryIndex;
     var bookIdIndex = ctx.Schema.Orders.BookIdIndex;
-    var quantityIndex = ctx.Schema.Orders.QuantityRangeIndex;
-    
-    // example of RangeScanIndex
-    var booksRange = quantityIndex.SelectRange(0, 5).ToArray();
-    
-    // example of MultiValueIndex
-    var booksWithCategory1 = categoryIndex.Find(1).ToArray();
     
     // example of ValueIndex
     if (books.TryGet(1, out var book))
