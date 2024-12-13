@@ -62,7 +62,7 @@ public class StereoDbBenchmark
 
             foreach (var item in _allData)
             {
-                table.Set(item);
+                table.Set(item.Id, item);
             }
         });
     }
@@ -90,7 +90,7 @@ public class StereoDbBenchmark
                         var randomUser = _allData[index];
 
                         var table = ctx.UseTable(ctx.Schema.Users.Table);
-                        table.Set(randomUser);
+                        table.Set(randomUser.Id, randomUser);
                     });
 
                     Interlocked.Increment(ref CurrentDbWriteCount1);
@@ -136,7 +136,7 @@ public class StereoDbBenchmark
                         var randomUser = _allData[index];
 
                         var table = ctx.UseTable(ctx.Schema.Users.Table);
-                        table.Set(randomUser);
+                        table.Set(randomUser.Id, randomUser);
                     });
 
                     Interlocked.Increment(ref CurrentDbWriteCount2);

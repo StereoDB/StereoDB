@@ -14,7 +14,7 @@ db.WriteTransaction(ctx =>
     foreach (var id in Enumerable.Range(0, 10))
     {
         var book = new Book { Id = id, Title = $"book_{id}", Quantity = 1, Categories = [ 1, 2 ] };
-        books.Set(book);
+        books.Set(book.Id, book);
     }
 });
        
@@ -33,8 +33,8 @@ db.WriteTransaction(ctx =>
             var order = new Order {Id = Guid.NewGuid(), BookId = id, Quantity = 1};
             var updatedBook = book with { Quantity = book.Quantity - 1 };
             
-            books.Set(updatedBook);
-            orders.Set(order);
+            books.Set(updatedBook.Id, updatedBook);
+            orders.Set(order.Id, order);
         }
     }
 });

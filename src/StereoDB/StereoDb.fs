@@ -77,12 +77,6 @@ namespace StereoDB.CSharp
             StereoDbTable<'TId, 'TEntity>(tableName)
             :> IConfigurationTable<_, _>
             
-    type StereoDbExtensions =
-    
-        [<Extension>]
-        static member inline Set(table: IReadWriteTable<'TId, 'TEntity>, entity: 'TEntity when 'TEntity : (member Id: 'TId)) =
-            table.Set(entity.Id, entity)            
-            
 namespace StereoDB.FSharp
 
     open System.Runtime.CompilerServices
