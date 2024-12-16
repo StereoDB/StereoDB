@@ -54,6 +54,7 @@
         <PackageReference Include="Microsoft.IO.RecyclableMemoryStream" Version="3.0.1" />
         <PackageReference Include="RepoDb.Sqlite.Microsoft" Version="1.13.1" />
         <PackageReference Include="Serilog" Version="4.1.0" />
+        <PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
         <PackageReference Include="System.Threading.Channels" Version="9.0.0" />        
     </ItemGroup>
 
