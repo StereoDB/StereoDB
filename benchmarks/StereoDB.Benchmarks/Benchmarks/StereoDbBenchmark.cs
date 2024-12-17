@@ -34,6 +34,7 @@ class Schema : IDbSchema
 // }
 
 [MemoryDiagnoser]
+[SimpleJob(launchCount: 1, warmupCount: 5, iterationCount: 5)]
 public class StereoDbBenchmark
 {
     private List<User> _allData;
@@ -48,6 +49,8 @@ public class StereoDbBenchmark
     [Params(30)] public int WriteThreadCount = 0;
     
     [Params(4_000_000)] public int UsersCount;
+    // [Params(1_000_000)] public int DbReadCount;
+    // [Params(500_000)] public int DbWriteCount;
     [Params(3_000_000)] public int DbReadCount;
     [Params(100_000)] public int DbWriteCount;
 

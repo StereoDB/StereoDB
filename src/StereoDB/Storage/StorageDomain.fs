@@ -18,11 +18,11 @@ type internal RecordHeader<'TId> = {
     [<Key(1)>] IsRemoved: bool    
 }
 
-[<Struct; IsReadOnly>]
+[<Struct>]
 type internal ChangedRecord<'TId, 'TEntity> = {
     Id: 'TId
-    Entity: 'TEntity
-    IsRemoved: bool        
+    mutable Entity: 'TEntity
+    mutable IsRemoved: bool        
 }
 
 type EntityAddress = {

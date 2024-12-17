@@ -3,6 +3,7 @@
 open System
 open System.Collections.Generic
 open System.Runtime.CompilerServices
+open System.Runtime.InteropServices
 open StereoDB
 
 type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality> 
@@ -11,14 +12,13 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
     let addNewValue id newValue =
-        match _valueIds.TryGetValue newValue with
-        | true, ids ->
+        let mutable idsExist = false
+        let ids = &CollectionsMarshal.GetValueRefOrAddDefault(_valueIds, newValue, &idsExist)
+        if idsExist then
+            ids.Add(id) |> ignore            
+        else
+            ids <- HashSet<'TId>()
             ids.Add(id) |> ignore
-            
-        | _ ->
-            let ids = HashSet<'TId>()
-            ids.Add(id) |> ignore
-            _valueIds[newValue] <- ids
     
     let removeOldValue id oldValue =
         match _valueIds.TryGetValue oldValue with

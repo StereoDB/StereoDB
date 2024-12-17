@@ -10,6 +10,6 @@ let [<Literal>] LoadAddressPullBatchSize = 100 // how many records we pull from 
 
 let [<Literal>] WriteTsLimitToCheckpoint = 2_000 // how many write transactions we wait before checkpoint  
 
-let CommitDelay = TimeSpan.FromSeconds 1
+let CommitDelay = TimeSpan.FromSeconds 1.0
 
-let CheckpointDelay = TimeSpan.FromMinutes 1
+let CheckpointDelay = TimeSpan.FromMinutes 1.0

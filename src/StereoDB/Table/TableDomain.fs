@@ -3,6 +3,7 @@
 open System
 open System.Collections.Concurrent
 open System.Collections.Generic
+open System.Runtime.InteropServices
 open MessagePack
 open StereoDB
 open StereoDB.Infra.Utils
@@ -67,41 +68,59 @@ module TableOperations =
         match data.TryGetValue id with
         | true, v  -> ValueSome v.Entity
         | false, _ -> ValueNone
+
+    let setChange id entity (changeTracking: ChangeTracking<'TId,'TEntity>) =
+        let mutable recordExist = false
+        let oldRecord = &CollectionsMarshal.GetValueRefOrAddDefault(changeTracking.Changes, id, &recordExist)
         
+        if recordExist then
+            oldRecord.Entity <- entity
+            oldRecord.IsRemoved <- false
+        else
+            oldRecord <- { Id = id; Entity = entity; IsRemoved = false }
+            
     let set id entity (memData: MemoryData<'TId,'TEntity>) =
         
-        match memData.Data.TryGetValue id with
-        | true, oldRecord ->
+        let mutable recordExist = false
+        let oldRecord = &CollectionsMarshal.GetValueRefOrAddDefault(memData.Data, id, &recordExist)
+        
+        if recordExist then
             for index in memData.Indexes do
                 index.TryReIndex(id, oldRecord.Entity, entity)
             
             oldRecord.Entity <- entity
-            oldRecord.IsEmpty <- false
-            memData.Data[id] <- oldRecord
+            oldRecord.IsEmpty <- false            
             
             if memData.ChangeTracking.IsEnabled then
-                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
-        
-        | _ ->
+                setChange id entity memData.ChangeTracking                
+        else
             for index in memData.Indexes do
                 index.AddToIndex(id, entity)
                 
-            memData.Data[id] <- { Entity = entity; IsEmpty = false }
+            oldRecord <- { Entity = entity; IsEmpty = false }
             
             if memData.ChangeTracking.IsEnabled then
-                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = entity; IsRemoved = false }
-                
-    let delete id (memData: MemoryData<'TId,'TEntity>) =            
+                setChange id entity memData.ChangeTracking
+
+    let deleteChange id (changeTracking: ChangeTracking<'TId,'TEntity>) =
+        let mutable recordExist = false
+        let oldRecord = &CollectionsMarshal.GetValueRefOrAddDefault(changeTracking.Changes, id, &recordExist)        
         
+        if recordExist then            
+            oldRecord.IsRemoved <- true
+        else
+            oldRecord <- { Id = id; Entity = Unchecked.defaultof<_>; IsRemoved = true }
+                    
+    let delete id (memData: MemoryData<'TId,'TEntity>) =        
         match memData.Data.TryGetValue id with
-        | true, record ->                
+        | true, record ->
             for index in memData.Indexes do
                 index.RemoveFromIndex(id, record.Entity)                
         
             if memData.ChangeTracking.IsEnabled then
-                memData.ChangeTracking.Changes[id] <- { Id = id; Entity = Unchecked.defaultof<_>; IsRemoved = true }
+                deleteChange id memData.ChangeTracking
         
-        | false, _ -> ()        
+        | false, _ -> ()
         
         memData.Data.Remove id
         
