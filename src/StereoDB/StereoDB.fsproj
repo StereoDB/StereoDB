@@ -3,12 +3,12 @@
     <PropertyGroup>
         <Title>StereoDB</Title>
         <Description>Ultrafast and lightweight in-process memory database that supports: transactions, secondary indexes, persistence, and data size larger than memory.</Description>
-        <TargetFramework>netstandard2.1</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <Authors>Anton Moldovan</Authors>
         <Company>StereoDB</Company>
         <Version>0.4.0</Version>
         <Copyright>StereoDB@2024</Copyright>
-        <Nullable>enable</Nullable>
+        <Nullable>disable</Nullable>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -47,7 +47,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="8.0.401" />        
+        <PackageReference Update="FSharp.Core" Version="9.0.100" />        
         <PackageReference Include="FsToolkit.ErrorHandling.IcedTasks" Version="4.18.0" />        
         <PackageReference Include="MessagePack" Version="2.5.192" />
         <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />        
