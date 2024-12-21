@@ -24,6 +24,7 @@
     <ItemGroup>
         <Compile Include="AssemblyInfo.fs" />
         <Compile Include="Constants.fs" />
+        <Compile Include="Infra\Heartbeat.fs" />
         <Compile Include="Infra\Utils.fs" />
         <Compile Include="Infra\SkipList.fs" />
         <Compile Include="Storage\StorageDomain.fs" />
@@ -47,7 +48,8 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Update="FSharp.Core" Version="9.0.100" />        
+        <PackageReference Update="FSharp.Core" Version="9.0.100" /> 
+        <PackageReference Include="Confluent.Kafka" Version="2.6.1" />  
         <PackageReference Include="FsToolkit.ErrorHandling.IcedTasks" Version="4.18.0" />        
         <PackageReference Include="MessagePack" Version="2.5.192" />
         <PackageReference Include="Microsoft.FASTER.Core" Version="2.6.5" />        

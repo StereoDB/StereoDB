@@ -49,3 +49,11 @@ module MessagePack =
     
     let defaultOptions =
         MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)
+
+
+module IPAddress = 
+    open System.Net
+
+    let nodeIp= 
+        let ipHostInfo = Dns.GetHostEntry(Dns.GetHostName())
+        ipHostInfo.AddressList[0].ToString()
