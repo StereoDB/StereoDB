@@ -18,11 +18,10 @@ open System.Threading
 let ``Heartbeat is sent on db init`` () = task {
     let settings = StereoDbSettings.OnlyInMemory
     use! db = StereoDb.init(Schema(), settings)
-    do! Task.Delay(TimeSpan.FromSeconds(10)) // wait for heartbeat messages to be sent
+    do! Task.Delay(TimeSpan.FromSeconds(20)) // wait for heartbeat messages to be sent
 
     use kafkaConsumer = ConsumerBuilder(
         ConsumerConfig(
-            GroupId = "test-group-id"
             BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers)).Build()
 
     use cts = new CancellationTokenSource()
@@ -30,7 +29,7 @@ let ``Heartbeat is sent on db init`` () = task {
     let heartbeatMessages = ConcurrentBag<string>()
 
     task {
-        kafkaConsumer.Subscribe(db.HeartbeatTopic)
+        kafkaConsumer.Subscribe(settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId))
         while true do
             let msg = kafkaConsumer.Consume(cts.Token)
             heartbeatMessages.Add(msg.Message.Value)

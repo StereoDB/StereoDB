@@ -2,6 +2,7 @@
 #nowarn "3261"
 
 open System
+open System.Linq
 open System.Runtime.InteropServices
 open System.Threading
 open System.Threading.Tasks
@@ -25,7 +26,7 @@ type StereoDbSettings = {
 }
 with
     static member OnlyInMemory = {
-        ClusterId = Guid.NewGuid().ToString()
+        ClusterId = Random.Shared.NextInt64().ToString()
         LocalPersistenceEnabled = false
         EntitySerializer = Unchecked.defaultof<_>
         DbFolderPath = ""
@@ -36,7 +37,7 @@ with
         [<Optional; DefaultParameterValue(null:MessagePackSerializerOptions)>] options: MessagePackSerializerOptions,
         [<Optional; DefaultParameterValue("":string)>] dbFolderPath: string) = {
         
-        ClusterId = Guid.NewGuid().ToString()
+        ClusterId = Random.Shared.NextInt64().ToString()
         LocalPersistenceEnabled = true
         DbFolderPath = dbFolderPath
         EntitySerializer = {
@@ -135,10 +136,17 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                 ex -> ()
     }
 
-    let createHeartbeatTopic (config: HeartbeatConfig) = task {
-        use adminClient = AdminClientBuilder(AdminClientConfig()).Build()
+    let createHeartbeatTopic (config: HeartbeatConfig) = valueTask {
+        use adminClient = AdminClientBuilder(
+            AdminClientConfig(BootstrapServers = config.KafkaBootstrapServers)).Build()
+
         try
-            do! adminClient.CreateTopicsAsync(
+            // let! existingTopics = adminClient.DescribeTopicsAsync(TopicCollection.OfTopicNames([_heartbeatTopic]))
+            // let heartbeatTopicExists = existingTopics.TopicDescriptions.Exists(
+            //     fun t -> t.Name = _heartbeatTopic && not t.Error.IsError)
+            // if heartbeatTopicExists then
+            //     return! ValueTask.FromResult()
+            let! r = adminClient.CreateTopicsAsync(
                 [TopicSpecification(
                     Name = _heartbeatTopic,
                     Configs = Dictionary<string, string> (
@@ -147,35 +155,33 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                 )],
                 CreateTopicsOptions()
             )
-        with 
-        | ex -> logger.Error("Error during creating topic")
+            r |> ignore
+        with
+            ex -> logger.Error(ex, "Error during creating hearbeat topic")
     }
 
-    let startHearbeatTask (config: HeartbeatConfig) = task {
+    let startHearbeatTask (config: HeartbeatConfig) = valueTask {
         do! createHeartbeatTopic config
  
-        let producerConfig = ProducerConfig(
+        use producer = ProducerBuilder<string, string>(ProducerConfig(
             BootstrapServers = config.KafkaBootstrapServers,
-            Acks = Acks.Leader
-        )
-        use producer = ProducerBuilder<string, string>(producerConfig).Build()
+            Acks = Acks.Leader)).Build()
 
         while _working do
             try
                 let message = Message<string, string>(
                     Value = $"Heartbeat {IPAddress.nodeIp}"
                 )
-                producer.ProduceAsync(_heartbeatTopic, message) |> Async.AwaitTask |> ignore
+                let! d = producer.ProduceAsync(_heartbeatTopic, message)
+                do! Task.Delay(config.HeartbeatInterval)
             with
-            | ex -> logger.Error("Error during sending heartbeat")
-            
-            do! Async.Sleep(config.HeartbeatInterval)
+                ex -> logger.Error(ex, "Error during sending heartbeat")
     }
-    
+
     member this.InitDb() = valueTask {
-        startHearbeatTask |> ignore
+        startHearbeatTask settings.HeartbeatConfig |> ignore
         _allTables |> Array.iter(fun x -> x.Init logger)
-        
+
         if settings.LocalPersistenceEnabled then
             let dbPath = StorageOperations.createDbFilePath settings.DbFolderPath
             let storageLog   = StorageLog.Init(dbPath.DbLogFolder, updateEntity)

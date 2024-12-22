@@ -1,4 +1,5 @@
 module StereoDB.Infra.Heartbeat
+
 open System
 
 type HeartbeatConfig = {
@@ -15,4 +16,4 @@ with
         HeartbeatInterval = TimeSpan.FromSeconds(5)
     }
 
-    member this.KafkaHeartbeatTopic(clusterId: string) = $"{this.KafkaHeartbeatTopic}_{clusterId}"
+    member this.KafkaHeartbeatTopic(clusterId: string) = $"{this.KafkaHeartbeatTopicPrefix}{clusterId}"
