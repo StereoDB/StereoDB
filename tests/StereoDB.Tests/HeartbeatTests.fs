@@ -14,25 +14,30 @@ open Tests.TestHelper
 open System
 open System.Threading
 
-[<Fact>]
+[<Fact(Skip = "requires local kafka")>]
+// [<Fact>]
 let ``Heartbeat is sent on db init`` () = task {
     let settings = StereoDbSettings.OnlyInMemory
-    use! db = StereoDb.init(Schema(), settings)
-    do! Task.Delay(TimeSpan.FromSeconds(20)) // wait for heartbeat messages to be sent
 
-    use kafkaConsumer = ConsumerBuilder(
+    use! db = StereoDb.init(Schema(), settings)
+    use kafkaConsumer = ConsumerBuilder<string, string>(
         ConsumerConfig(
-            BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers)).Build()
+            BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers,
+            EnableAutoCommit = true,
+            GroupId = Random.Shared.NextInt64().ToString())).Build()
 
     use cts = new CancellationTokenSource()
+    cts.CancelAfter(TimeSpan.FromSeconds(10)) // wait for heartbeat messages to be sent
+
     let tcs = TaskCompletionSource()
     let heartbeatMessages = ConcurrentBag<string>()
 
     task {
         kafkaConsumer.Subscribe(settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId))
-        while true do
+        while cts.IsCancellationRequested do
             let msg = kafkaConsumer.Consume(cts.Token)
             heartbeatMessages.Add(msg.Message.Value)
+        tcs.SetResult()
     } |> ignore
 
     do! tcs.Task
