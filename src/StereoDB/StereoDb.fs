@@ -69,6 +69,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
     let _heartbeatTopic = settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId)
+    let _consumeHeartbeatCancelToken = CancellationTokenSource()
 
     let updateEntity tableId logEntry =
         _allTablesDict[tableId].UpdateEntity logEntry
@@ -152,6 +153,22 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
             )
         with
             ex -> logger.Error(ex, "Error during creating hearbeat topic")
+    }
+    
+    let listenHeartbeat (config: HeartbeatConfig) = valueTask {
+        use kafkaConsumer = ConsumerBuilder<string, string>(
+            ConsumerConfig(
+                BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers,
+                GroupId = settings.ClusterId)).Build()
+  
+        kafkaConsumer.Subscribe($"^{_heartbeatTopic}.+") // subscribe to all heartbeat topics by regex
+        
+        while _working do
+            try
+                let msg = kafkaConsumer.Consume(_consumeHeartbeatCancelToken.Token)
+                logger.Information("Got heartbeat message", msg.Message.Value)
+            with
+                ex -> logger.Error(ex, "Error during consuming heartbeat messages")
     }
 
     let startHearbeatTask (config: HeartbeatConfig) = valueTask {
@@ -260,6 +277,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                     if _storageLog.IsSome then
                         _currentCommitCancelToken.Cancel()
                         _currentCheckpointCancelToken.Cancel()
+                        _consumeHeartbeatCancelToken.Cancel()
                         do! Task.WhenAll(_currentCommitTask, _currentCheckpointTask)                    
                         do! disposeAsync _entityAddressStore.Value
                         do! disposeAsync _storageLog.Value

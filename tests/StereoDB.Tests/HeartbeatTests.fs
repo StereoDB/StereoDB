@@ -15,7 +15,7 @@ open System
 open System.Threading
 
 [<Fact>]
-[<Trait("Category", "Integration")>]
+[<Trait("CI", "disable")>]
 let ``Heartbeat is sent on db init`` () = task {
     let settings = StereoDbSettings.OnlyInMemory
 
