@@ -1,4 +1,4 @@
-name: redpanda-quickstart
+name: stereodb-redpanda-cluster
 networks:
   redpanda_network:
     driver: bridge
