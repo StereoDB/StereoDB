@@ -23,6 +23,7 @@ let ``Heartbeat is sent on db init`` () = task {
     use kafkaConsumer = ConsumerBuilder<string, string>(
         ConsumerConfig(
             BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers,
+            AutoOffsetReset = AutoOffsetReset.Latest,
             GroupId = Random.Shared.NextInt64().ToString())).Build()
 
     use cts = new CancellationTokenSource()
@@ -35,9 +36,9 @@ let ``Heartbeat is sent on db init`` () = task {
         kafkaConsumer.Subscribe(settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId))
         try
             while not cts.IsCancellationRequested do
+                do! Task.Yield()
                 let msg = kafkaConsumer.Consume(cts.Token)
                 heartbeatMessages.Add(msg.Message.Value)
-                do! Task.Yield()
         with
             _ ->
                 kafkaConsumer.Close()

@@ -155,25 +155,30 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
             ex -> logger.Error(ex, "Error during creating hearbeat topic")
     }
     
-    let listenHeartbeat (config: HeartbeatConfig) = valueTask {
+    let listenHeartbeatTopics (config: HeartbeatConfig) = valueTask {
         use kafkaConsumer = ConsumerBuilder<string, string>(
             ConsumerConfig(
                 BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers,
-                GroupId = settings.ClusterId)).Build()
-  
-        kafkaConsumer.Subscribe($"^{_heartbeatTopic}.+") // subscribe to all heartbeat topics by regex
+                AutoOffsetReset = AutoOffsetReset.Latest,
+                GroupId = config.KafkaHeartbeatTopicPrefix)).Build()
+
+        kafkaConsumer.Subscribe($"^{config.KafkaHeartbeatTopicPrefix}.+")  // subscribe to all heartbeat topics by regex
         
         while _working do
             try
+                do! Task.Yield()
                 let msg = kafkaConsumer.Consume(_consumeHeartbeatCancelToken.Token)
                 logger.Information("Got heartbeat message", msg.Message.Value)
             with
                 ex -> logger.Error(ex, "Error during consuming heartbeat messages")
+
+        kafkaConsumer.Close()
     }
 
     let startHearbeatTask (config: HeartbeatConfig) = valueTask {
         do! createHeartbeatTopic config
- 
+        listenHeartbeatTopics config |> ignore
+
         use producer = ProducerBuilder<string, string>(ProducerConfig(
             BootstrapServers = config.KafkaBootstrapServers,
             Acks = Acks.Leader)).Build()
@@ -183,8 +188,8 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                 let message = Message<string, string>(
                     Value = $"Heartbeat {IPAddress.nodeIp}"
                 )
-                let! d = producer.ProduceAsync(_heartbeatTopic, message)
-                d |> ignore
+                let! _ = producer.ProduceAsync(_heartbeatTopic, message)
+                do! Task.Yield()
             with
                 ex -> logger.Error(ex, "Error during sending heartbeat")
                 
