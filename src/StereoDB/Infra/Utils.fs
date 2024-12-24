@@ -1,7 +1,9 @@
 ﻿module internal StereoDB.Infra.Utils
 
 open System
+open System.Linq
 open System.Collections.Generic
+open System.Net.Sockets
 open MessagePack
 open MessagePack.Resolvers
 
@@ -54,6 +56,6 @@ module MessagePack =
 module IPAddress = 
     open System.Net
 
-    let nodeIp= 
+    let nodeIp = 
         let ipHostInfo = Dns.GetHostEntry(Dns.GetHostName())
-        ipHostInfo.AddressList[0].ToString()
+        ipHostInfo.AddressList.First(fun a -> a.AddressFamily = AddressFamily.InterNetwork)
