@@ -12,8 +12,8 @@ with
     static member Default = {
         KafkaBootstrapServers = "localhost:19092"
         KafkaHeartbeatTopicPrefix = "stereodb_cluster"
-        KafkaHeartbeatTopicRetention = TimeSpan.FromSeconds(10)
-        HeartbeatInterval = TimeSpan.FromSeconds(5)
+        KafkaHeartbeatTopicRetention = TimeSpan.FromSeconds 10
+        HeartbeatInterval = TimeSpan.FromSeconds 5
     }
 
     member this.KafkaHeartbeatTopic(clusterId: string) = $"{this.KafkaHeartbeatTopicPrefix}{clusterId}"
