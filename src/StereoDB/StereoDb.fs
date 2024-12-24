@@ -69,7 +69,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
     let _heartbeatTopic = settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId)
-    let _consumeHeartbeatCancelToken = CancellationTokenSource()
+    let _consumeHeartbeatCancelToken = new CancellationTokenSource()
 
     let updateEntity tableId logEntry =
         _allTablesDict[tableId].UpdateEntity logEntry
@@ -162,7 +162,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                 AutoOffsetReset = AutoOffsetReset.Latest,
                 GroupId = config.KafkaHeartbeatTopicPrefix)).Build()
 
-        kafkaConsumer.Subscribe($"^{config.KafkaHeartbeatTopicPrefix}.+")  // subscribe to all heartbeat topics by regex
+        kafkaConsumer.Subscribe($"^.*{settings.ClusterId}$")  // subscribe to all heartbeat topics by regex
         
         while _working do
             try
@@ -185,11 +185,12 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
 
         while _working do
             try
+                do! Task.Yield()
                 let message = Message<string, string>(
                     Value = $"Heartbeat {IPAddress.nodeIp}"
                 )
-                let! _ = producer.ProduceAsync(_heartbeatTopic, message)
-                do! Task.Yield()
+                let! r = producer.ProduceAsync(_heartbeatTopic, message)
+                r |> ignore
             with
                 ex -> logger.Error(ex, "Error during sending heartbeat")
                 
