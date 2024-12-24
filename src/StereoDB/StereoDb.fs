@@ -2,32 +2,42 @@
 #nowarn "3261"
 
 open System
+open System.Linq
 open System.Runtime.InteropServices
 open System.Threading
 open System.Threading.Tasks
+open Confluent.Kafka
+open Confluent.Kafka.Admin
 open IcedTasks
 open MessagePack
 open Serilog
 open StereoDB
 open StereoDB.Storage
 open StereoDB.Infra.Utils
+open StereoDB.Infra.Heartbeat
+open System.Collections.Generic
 
 type StereoDbSettings = {
+    ClusterId: string
     LocalPersistenceEnabled: bool
     EntitySerializer: IEntitySerializer
     DbFolderPath: string
+    HeartbeatConfig: HeartbeatConfig
 }
 with
     static member OnlyInMemory = {
+        ClusterId = "1234"
         LocalPersistenceEnabled = false
         EntitySerializer = Unchecked.defaultof<_>
         DbFolderPath = ""
+        HeartbeatConfig = HeartbeatConfig.Default
     }
     
     static member FileStorageMsgPack(
         [<Optional; DefaultParameterValue(null:MessagePackSerializerOptions)>] options: MessagePackSerializerOptions,
         [<Optional; DefaultParameterValue("":string)>] dbFolderPath: string) = {
         
+        ClusterId = Random.Shared.NextInt64().ToString()
         LocalPersistenceEnabled = true
         DbFolderPath = dbFolderPath
         EntitySerializer = {
@@ -35,6 +45,7 @@ with
                 member this.Serialize(writer, value) = MessagePackSerializer.Serialize(writer, value, options)
                 member this.Deserialize(data) = MessagePackSerializer.Deserialize(data, options)
         }
+        HeartbeatConfig = HeartbeatConfig.Default
     }
 
 type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, schema: 'TSchema, settings: StereoDbSettings) =
@@ -57,6 +68,9 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     let _rCtx = { ReadOnlyTsContext.Schema = schema }
     let _rwCtx = { ReadWriteTsContext.Schema = schema }
     
+    let _heartbeatTopic = settings.HeartbeatConfig.KafkaHeartbeatTopic(settings.ClusterId)
+    let _consumeHeartbeatCancelToken = new CancellationTokenSource()
+
     let updateEntity tableId logEntry =
         _allTablesDict[tableId].UpdateEntity logEntry
         
@@ -122,10 +136,71 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
             with
                 ex -> ()
     }
+
+    let createHeartbeatTopic (config: HeartbeatConfig) = valueTask {
+        use adminClient = AdminClientBuilder(
+            AdminClientConfig(BootstrapServers = config.KafkaBootstrapServers)).Build()
+
+        try
+            do! adminClient.CreateTopicsAsync(
+                [TopicSpecification(
+                    Name = _heartbeatTopic,
+                    Configs = Dictionary<string, string> (
+                        dict [("retention.ms", config.KafkaHeartbeatTopicRetention.TotalMilliseconds.ToString())]
+                    )
+                )],
+                CreateTopicsOptions()
+            )
+        with
+            ex -> logger.Error(ex, "Error during creating hearbeat topic")
+    }
     
-    member this.InitDb() = valueTask {
-        _allTables |> Array.iter(fun x -> x.Init logger)
+    let listenHeartbeatTopics (config: HeartbeatConfig) = valueTask {
+        use kafkaConsumer = ConsumerBuilder<string, string>(
+            ConsumerConfig(
+                BootstrapServers = settings.HeartbeatConfig.KafkaBootstrapServers,
+                AutoOffsetReset = AutoOffsetReset.Latest,
+                GroupId = config.KafkaHeartbeatTopicPrefix)).Build()
+
+        kafkaConsumer.Subscribe($"^.*{settings.ClusterId}$")  // subscribe to all heartbeat topics by regex
         
+        while _working do
+            try
+                do! Task.Yield()
+                let msg = kafkaConsumer.Consume(_consumeHeartbeatCancelToken.Token)
+                logger.Information("Got heartbeat message", msg.Message.Value)
+            with
+                ex -> logger.Error(ex, "Error during consuming heartbeat messages")
+
+        kafkaConsumer.Close()
+    }
+
+    let startHearbeatTask (config: HeartbeatConfig) = valueTask {
+        do! createHeartbeatTopic config
+        listenHeartbeatTopics config |> ignore
+
+        use producer = ProducerBuilder<string, string>(ProducerConfig(
+            BootstrapServers = config.KafkaBootstrapServers,
+            Acks = Acks.Leader)).Build()
+
+        while _working do
+            try
+                do! Task.Yield()
+                let message = Message<string, string>(
+                    Value = $"Heartbeat {IPAddress.nodeIp}"
+                )
+                let! r = producer.ProduceAsync(_heartbeatTopic, message)
+                r |> ignore
+            with
+                ex -> logger.Error(ex, "Error during sending heartbeat")
+                
+            do! Task.Delay(config.HeartbeatInterval)
+    }
+
+    member this.InitDb() = valueTask {
+        startHearbeatTask settings.HeartbeatConfig |> ignore
+        _allTables |> Array.iter(fun x -> x.Init logger)
+
         if settings.LocalPersistenceEnabled then
             let dbPath = StorageOperations.createDbFilePath settings.DbFolderPath
             let storageLog   = StorageLog.Init(dbPath.DbLogFolder, updateEntity)
@@ -208,6 +283,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
                     if _storageLog.IsSome then
                         _currentCommitCancelToken.Cancel()
                         _currentCheckpointCancelToken.Cancel()
+                        _consumeHeartbeatCancelToken.Cancel()
                         do! Task.WhenAll(_currentCommitTask, _currentCheckpointTask)                    
                         do! disposeAsync _entityAddressStore.Value
                         do! disposeAsync _storageLog.Value

@@ -14,6 +14,7 @@
         <Compile Include="SecondaryIndex\MultiValueIndexTests.fs" />
         <Compile Include="Storage\BasicPersistenceTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
+        <Compile Include="HeartbeatTests.fs" />
         <Compile Include="UtilsTests.fs" />
         <Compile Include="Program.fs" />        
     </ItemGroup>
