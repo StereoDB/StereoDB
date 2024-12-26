@@ -7,10 +7,12 @@ open System.Threading.Tasks
 open IcedTasks
 open Serilog
 open StereoDB
+open StereoDB.Infra.ConcurrencyControl
 open StereoDB.Storage
 open StereoDB.Infra.Utils
 
-type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, schema: 'TSchema, settings: StereoDbSettings) =
+type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(
+    logger: ILogger, threadLock: IThreadLock, schema: 'TSchema, settings: StereoDbSettings) =
     
     let mutable _working = true
     let mutable _currentCommitTask = Task.CompletedTask
@@ -22,8 +24,7 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     let mutable _entityAddressStore = None
     let mutable _writeTxnCountFromLatestCheckpoint = 0L
     let mutable _writeTxnCountFromLatestCommit = 0L
-    
-    let _lockSlim = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion)
+        
     let _allTables = schema.AllTables |> Seq.cast<ITableControl> |> Seq.toArray
     let _allTablesDict = _allTables |> Seq.map(fun x -> (x :?> ITable).TableId, x) |> readOnlyDict
     
@@ -52,13 +53,14 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
     let commit (storageLog: StorageLog) = valueTask {
         if Interlocked.Read(&_writeTxnCountFromLatestCommit) > 0 then
             
-            let tablesChanges =                
-                try                                        
-                    _lockSlim.EnterWriteLock()
+            let tablesChanges =
+                let threadId = Thread.CurrentThread.ManagedThreadId
+                try
+                    threadLock.EnterWriteLock threadId                    
                     Interlocked.Exchange(&_writeTxnCountFromLatestCommit, 0L) |> ignore
                     _allTables |> Array.map(_.GetChangesAndReset())                    
                 finally
-                    _lockSlim.ExitWriteLock()        
+                    threadLock.ReleaseWriteLock threadId        
             
             for i = 0 to _allTables.Length - 1 do        
                 let changes = tablesChanges[i]
@@ -117,60 +119,70 @@ type internal StereoDb<'TSchema when 'TSchema :> IDbSchema>(logger: ILogger, sch
            
     interface CSharp.IStereoDb<'TSchema> with           
             
-        member this.ReadTransaction<'T>(transaction: Func<ReadOnlyTsContext<'TSchema>, 'T>) =            
+        member this.ReadTransaction<'T>(transaction: Func<ReadOnlyTsContext<'TSchema>, 'T>) =
+            let threadId = Thread.CurrentThread.ManagedThreadId
             try
-                _lockSlim.EnterReadLock()
+                threadLock.EnterReadLock threadId                
                 transaction.Invoke(_rCtx)                
             finally
-                _lockSlim.ExitReadLock()            
+                threadLock.ReleaseReadLock threadId  
             
         member this.WriteTransaction<'T>(transaction: Func<ReadWriteTsContext<'TSchema>, 'T>) =            
             Interlocked.Increment(&_writeTxnCountFromLatestCheckpoint) |> ignore
             Interlocked.Increment(&_writeTxnCountFromLatestCommit) |> ignore
             
+            let threadId = Thread.CurrentThread.ManagedThreadId
+            
             try
-                _lockSlim.EnterWriteLock()                 
+                threadLock.EnterWriteLock threadId         
                 transaction.Invoke(_rwCtx)
             finally
-                _lockSlim.ExitWriteLock()                            
+                threadLock.ReleaseWriteLock threadId                  
                         
         member this.WriteTransaction(transaction: Action<ReadWriteTsContext<'TSchema>>) =
             Interlocked.Increment(&_writeTxnCountFromLatestCheckpoint) |> ignore
             Interlocked.Increment(&_writeTxnCountFromLatestCommit) |> ignore
             
+            let threadId = Thread.CurrentThread.ManagedThreadId
+            
             try
-                _lockSlim.EnterWriteLock()
+                threadLock.EnterWriteLock threadId
                 transaction.Invoke(_rwCtx)
             finally
-                _lockSlim.ExitWriteLock()
+                threadLock.ReleaseWriteLock threadId
                 
     interface FSharp.IStereoDb<'TSchema> with        
         member this.ReadTransaction(transaction: ReadOnlyTsContext<'TSchema> -> 'T voption) =
+            let threadId = Thread.CurrentThread.ManagedThreadId
             try
-                _lockSlim.EnterReadLock()
+                threadLock.EnterReadLock threadId
                 transaction _rCtx            
             finally
-                _lockSlim.ExitReadLock()
+                threadLock.ReleaseReadLock threadId
             
         member this.WriteTransaction<'T>(transaction: ReadWriteTsContext<'TSchema> -> 'T voption) =
             Interlocked.Increment(&_writeTxnCountFromLatestCheckpoint) |> ignore
             Interlocked.Increment(&_writeTxnCountFromLatestCommit) |> ignore
             
+            let threadId = Thread.CurrentThread.ManagedThreadId
+            
             try
-                _lockSlim.EnterWriteLock()
+                threadLock.EnterWriteLock threadId
                 transaction _rwCtx            
             finally
-                _lockSlim.ExitWriteLock()
+                threadLock.ReleaseWriteLock threadId
         
         member this.WriteTransaction(transaction: ReadWriteTsContext<'TSchema> -> unit) =
             Interlocked.Increment(&_writeTxnCountFromLatestCheckpoint) |> ignore
             Interlocked.Increment(&_writeTxnCountFromLatestCommit) |> ignore
             
+            let threadId = Thread.CurrentThread.ManagedThreadId
+            
             try
-                _lockSlim.EnterWriteLock()
-                transaction _rwCtx
+                threadLock.EnterWriteLock threadId
+                transaction _rwCtx            
             finally
-                _lockSlim.ExitWriteLock()
+                threadLock.ReleaseWriteLock threadId
                 
     interface IAsyncDisposable with
         member this.DisposeAsync() =
@@ -193,13 +205,14 @@ namespace StereoDB.CSharp
     open IcedTasks
     open Serilog
     open StereoDB
+    open StereoDB.Infra.ConcurrencyControl
     open StereoDB.Storage
     open StereoDB.Table
     
     type StereoDb =
         static member Init(schema, settings) = valueTask {
             let logger = LoggerConfiguration().CreateLogger()            
-            let db = new StereoDb<'TSchema>(logger, schema, settings)
+            let db = new StereoDb<'TSchema>(logger, CasSpinLock(), schema, settings)
             do! db.InitDb()
             return db :> IStereoDb<_>
         }
@@ -215,6 +228,7 @@ namespace StereoDB.FSharp
     open IcedTasks
     open Serilog
     open StereoDB
+    open StereoDB.Infra.ConcurrencyControl
     open StereoDB.Storage
     open StereoDB.Table
     
@@ -222,7 +236,7 @@ namespace StereoDB.FSharp
         
         let init (schema, settings) = valueTask {
             let logger = LoggerConfiguration().CreateLogger()
-            let db = new StereoDb<'TSchema>(logger, schema, settings)
+            let db = new StereoDb<'TSchema>(logger, CasSpinLock(), schema, settings)
             do! db.InitDb()
             return db :> IStereoDb<_>
         }
