@@ -1,9 +1,7 @@
 ﻿module internal StereoDB.Infra.Utils
 
 open System
-open System.Linq
 open System.Collections.Generic
-open System.Net.Sockets
 open MessagePack
 open MessagePack.Resolvers
 
@@ -51,11 +49,3 @@ module MessagePack =
     
     let defaultOptions =
         MessagePackSerializerOptions.Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)
-
-
-module IPAddress = 
-    open System.Net
-
-    let nodeIp = 
-        let ipHostInfo = Dns.GetHostEntry(Dns.GetHostName())
-        ipHostInfo.AddressList.First(fun a -> a.AddressFamily = AddressFamily.InterNetwork)

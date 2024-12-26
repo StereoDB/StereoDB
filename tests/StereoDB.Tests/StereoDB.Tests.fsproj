@@ -14,13 +14,11 @@
         <Compile Include="SecondaryIndex\MultiValueIndexTests.fs" />
         <Compile Include="Storage\BasicPersistenceTests.fs" />
         <Compile Include="BasicReadWriteTests.fs" />
-        <Compile Include="HeartbeatTests.fs" />
         <Compile Include="UtilsTests.fs" />
         <Compile Include="Program.fs" />        
     </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Maybe.NET" Version="1.0.123" />
+    <ItemGroup>        
         <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.18.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageReference Include="Serilog.Sinks.InMemory" Version="0.11.0" />
