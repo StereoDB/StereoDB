@@ -8,7 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="TestHelper.fs" />        
+        <Compile Include="TestHelper.fs" />
+        <Compile Include="SieveEviction\SieveEvictionTests.fs" />
         <Compile Include="SecondaryIndex\RangeScanIndexTests.fs" />
         <Compile Include="SecondaryIndex\ValueIndexTests.fs" />
         <Compile Include="SecondaryIndex\MultiValueIndexTests.fs" />
@@ -16,7 +17,7 @@
         <Compile Include="BasicReadWriteTests.fs" />
         <Compile Include="HeartbeatTests.fs" />
         <Compile Include="UtilsTests.fs" />
-        <Compile Include="Program.fs" />        
+        <Compile Include="Program.fs" />
     </ItemGroup>
 
     <ItemGroup>
