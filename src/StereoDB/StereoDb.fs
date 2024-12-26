@@ -212,7 +212,7 @@ namespace StereoDB.CSharp
     type StereoDb =
         static member Init(schema, settings) = valueTask {
             let logger = LoggerConfiguration().CreateLogger()            
-            let db = new StereoDb<'TSchema>(logger, CasSpinLock(), schema, settings)
+            let db = new StereoDb<'TSchema>(logger, CasRwSpinLock(), schema, settings)
             do! db.InitDb()
             return db :> IStereoDb<_>
         }
@@ -236,7 +236,7 @@ namespace StereoDB.FSharp
         
         let init (schema, settings) = valueTask {
             let logger = LoggerConfiguration().CreateLogger()
-            let db = new StereoDb<'TSchema>(logger, CasSpinLock(), schema, settings)
+            let db = new StereoDb<'TSchema>(logger, CasRwSpinLock(), schema, settings)
             do! db.InitDb()
             return db :> IStereoDb<_>
         }

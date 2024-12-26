@@ -57,7 +57,7 @@ public class StereoDbBenchmark
     private Int64 CurrentDbWriteCount2 = 0;
     private Int64 CurrentDbReadCount = 0;
     
-    [Params(Concurrency.CasRwSpinLock, Concurrency.CasSpinLock)] // Concurrency.CasRwSpinLock  
+    [Params(Concurrency.CasRwSpinLock, Concurrency.RwLockSlimLock)] // Concurrency.CasRwSpinLock  
     public Concurrency Concurrency = Concurrency.CasSpinLock;
     
     [Params(30)] public int ReadThreadCount = 0;

@@ -44,77 +44,64 @@ type CasSpinLock() =
         
         member this.EnterReadLock(threadId) = enterLock threadId
         member this.ReleaseReadLock(threadId) = releaseLock threadId
-        
+
 type CasRwSpinLock() =
+    let mutable _readersCount = 0L  // Tracks the number of active readers
+    let mutable _writerLock = 0L    // Indicates if a writer holds the lock (1 = locked, 0 = unlocked)
+    let mutable _writerWaiting = 0L // Indicates if a writer is waiting (1 = waiting, 0 = not waiting)
+
+    let enterReadLock () =
+        let spin = SpinWait()
+        let mutable lockAcquired = false
+        
+        while not lockAcquired do
+            // Check if a writer is waiting
+            if Interlocked.Read(&_writerWaiting) = 0L then
+                // Try to increment readersCount
+                Interlocked.Increment(&_readersCount) |> ignore
+                // Verify that no writer became active after incrementing
+                if Interlocked.Read(&_writerWaiting) = 0L then
+                    lockAcquired <- true
+                else
+                    // A writer is waiting; decrement readersCount and retry
+                    Interlocked.Decrement(&_readersCount) |> ignore
+                    spin.SpinOnce()
+            else
+                // A writer is waiting; spin and retry
+                spin.SpinOnce()
     
-    let mutable _currentTxThreadId = 0L
-    let mutable _readTxCounter = 0L
-    let mutable _readTxHistoryCounter = 0L
-    let CPUCores = Environment.ProcessorCount
+    let releaseReadLock () =
+        // Decrement the readers count
+        if Interlocked.Decrement(&_readersCount) < 0L then
+            failwith "release read lock failed - invalid state"
     
     let enterWriteLock threadId =
         let spin = SpinWait()
-        let mutable lockAcquired = false        
-        
+        let mutable lockAcquired = false
+
+        // Wait until no other writer is waiting
+        while Interlocked.CompareExchange(&_writerWaiting, 1L, 0L) <> 0L do
+            spin.SpinOnce()
+
         while not lockAcquired do
-            let currentThreadId = Interlocked.Read(&_currentTxThreadId)
-            
-            if Interlocked.CompareExchange(&_currentTxThreadId, threadId, 0) = 0 then
+            // Attempt to acquire the writer lock
+            if Interlocked.CompareExchange(&_writerLock, threadId, 0L) = 0L then
+                // Ensure all readers have completed
+                while Interlocked.Read(&_readersCount) > 0L do
+                    spin.SpinOnce()
                 lockAcquired <- true
-            
-            elif currentThreadId < 0 && Interlocked.Read(&_readTxCounter) = 0 && Interlocked.Read(&_readTxHistoryCounter) >= CPUCores then
-                if Interlocked.CompareExchange(&_currentTxThreadId, threadId, currentThreadId) = currentThreadId then
-                    lockAcquired <- true
-                    Interlocked.Exchange(&_readTxHistoryCounter, 0) |> ignore
             else
                 spin.SpinOnce()
     
     let releaseWriteLock threadId =
-        if Interlocked.CompareExchange(&_currentTxThreadId, 0, threadId) <> threadId then
-            failwith "release write lock failed"
-    
-    let enterReadLock threadId =
-        let spin = SpinWait()
-        let mutable lockAcquired = false
-        let mutable skipSpin = false
-        let mutable skipTryCount = 0
-        
-        while not lockAcquired do            
-            let currentThreadId = Interlocked.Read(&_currentTxThreadId)            
-            
-            if currentThreadId < 0 then
-                if Interlocked.Read(&_readTxHistoryCounter) < CPUCores
-                   && Interlocked.CompareExchange(&_currentTxThreadId, threadId, currentThreadId) = currentThreadId then
-                    lockAcquired <- true
-                
-                elif Interlocked.Read(&_readTxCounter) = 0 && Interlocked.Read(&_readTxHistoryCounter) >= CPUCores then                
-                    if Interlocked.CompareExchange(&_currentTxThreadId, threadId, currentThreadId) = currentThreadId then
-                        lockAcquired <- true
-                        Interlocked.Exchange(&_readTxHistoryCounter, 0) |> ignore
-                else
-                    skipSpin <- true
-                    skipTryCount <- skipTryCount + 1
-            
-            elif Interlocked.CompareExchange(&_currentTxThreadId, threadId, 0) = 0 then
-                lockAcquired <- true
-            
-            if lockAcquired then
-                Interlocked.Increment(&_readTxHistoryCounter) |> ignore
-                Interlocked.Increment(&_readTxCounter) |> ignore                
-            elif skipSpin && skipTryCount <= 1 then
-                ()
-            else
-                spin.SpinOnce()
-                skipTryCount <- 0
-                skipSpin <- false
-    
-    let releaseReadLock threadId =
-        Interlocked.Decrement(&_readTxCounter) |> ignore
-        Interlocked.CompareExchange(&_currentTxThreadId, 0, threadId) |> ignore
-    
+        // Release the writer lock
+        if Interlocked.CompareExchange(&_writerLock, 0L, threadId) <> threadId then
+            failwith "release write lock failed - lock not held by thread"
+        // Clear writer intent
+        Interlocked.Exchange(&_writerWaiting, 0L) |> ignore
+
     interface IThreadLock with
-        member this.EnterWriteLock(threadId) = enterWriteLock threadId            
-        member this.ReleaseWriteLock(threadId) = releaseWriteLock threadId            
-        
-        member this.EnterReadLock(threadId) = enterReadLock -threadId     // we mark readTxId with a minus        
-        member this.ReleaseReadLock(threadId) = releaseReadLock -threadId // we mark readTxId with a minus
+        member this.EnterReadLock(threadId) = enterReadLock()
+        member this.ReleaseReadLock(threadId) = releaseReadLock()
+        member this.EnterWriteLock(threadId) = enterWriteLock threadId
+        member this.ReleaseWriteLock(threadId) = releaseWriteLock threadId
