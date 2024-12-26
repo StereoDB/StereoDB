@@ -2,7 +2,14 @@
 using BenchmarkDotNet.Running;
 using StereoDB.Benchmarks.Benchmarks;
 
-//BenchmarkRunner.Run<StereoDbBenchmark>(new DebugInProcessConfig());
+// var b = new StereoDbBenchmark
+// {
+//     Concurrency = Concurrency.CasRwSpinLock
+// };
+// b.GlobalSetup();
+// b.Basic_Read_Modify_Write_Tx();
+
+// BenchmarkRunner.Run<StereoDbBenchmark>(new DebugInProcessConfig());
 BenchmarkRunner.Run<StereoDbBenchmark>();
 
 //BenchmarkRunner.Run<LMDBBenchmark>();
