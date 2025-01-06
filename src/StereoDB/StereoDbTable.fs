@@ -13,7 +13,10 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
     let _indexes = ResizeArray<ISecondaryIndex<'TId, 'TEntity>>()
 
     let getIds () =
-        _data.Keys |> Seq.map id       
+        _data.Keys |> Seq.map id
+        
+    let getAll () =
+        _data.Values |> Seq.map id        
         
     let get id =
         match _data.TryGetValue id with
@@ -110,6 +113,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         
     interface CSharp.IReadOnlyTable<'TId, 'TEntity> with        
         member this.GetIds() = getIds()
+        member this.GetAll() = getAll()
         member this.TryGet(id, entity) =
             match _data.TryGetValue id with
             | true, v ->
@@ -123,7 +127,8 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         member this.Delete(id) = delete id
         
     interface FSharp.IReadOnlyTable<'TId, 'TEntity> with        
-        member this.GetIds() = getIds()                          
+        member this.GetIds() = getIds()
+        member this.GetAll() = getAll()
         member this.Get(id) = get id        
         
     interface FSharp.IReadWriteTable<'TId, 'TEntity> with        

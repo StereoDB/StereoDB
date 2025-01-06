@@ -84,3 +84,29 @@ let ``GetIds should be supported`` () =
     let ids = result.Value
     
     test <@ ids.Length = 10 @>
+    
+[<Fact>]
+let ``GetAll should be supported`` () =
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+    
+    // add books
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        
+        for i in [1..10] do
+            let book = { Id = i; Title = $"book_{i}"; Quantity = 1 }
+            books.Set(book)
+    )
+    
+    let result = db.ReadTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)        
+        
+        let all = books.GetAll()        
+        
+        if Seq.isEmpty all then ValueNone
+        else ValueSome(all |> Seq.toArray)
+    )
+    
+    let books = result.Value
+    
+    test <@ books.Length = 10 @>    
