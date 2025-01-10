@@ -7,8 +7,9 @@ open StereoDB
 
 type IReadOnlyTable<'TId, 'TEntity> =
     inherit ITable<'TId, 'TEntity>
+    abstract Count: int64 with get
     abstract GetIds: unit -> 'TId seq
-    abstract GetAll: unit -> 'TEntity seq
+    abstract GetAll: unit -> 'TEntity seq    
     abstract TryGet: id:'TId * [<Out>]entity:'TEntity byref -> bool
     
 type IReadWriteTable<'TId, 'TEntity> =

@@ -111,7 +111,8 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         member this.TableName = tableName
         member this.TableIndex = _tableIndex
         
-    interface CSharp.IReadOnlyTable<'TId, 'TEntity> with        
+    interface CSharp.IReadOnlyTable<'TId, 'TEntity> with
+        member this.Count = _data.Count
         member this.GetIds() = getIds()
         member this.GetAll() = getAll()
         member this.TryGet(id, entity) =
@@ -126,7 +127,8 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         member this.Set(id, entity) = set id entity        
         member this.Delete(id) = delete id
         
-    interface FSharp.IReadOnlyTable<'TId, 'TEntity> with        
+    interface FSharp.IReadOnlyTable<'TId, 'TEntity> with
+        member this.Count = _data.Count
         member this.GetIds() = getIds()
         member this.GetAll() = getAll()
         member this.Get(id) = get id        
