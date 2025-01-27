@@ -11,24 +11,31 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
     let addNewValue id newValue =
-        match _valueIds.TryGetValue newValue with
-        | true, ids ->
-            ids.Add(id) |> ignore
-            
-        | _ ->
-            let ids = HashSet<'TId>()
-            ids.Add(id) |> ignore
-            _valueIds[newValue] <- ids
+        if typeof<'TValue>.IsClass && isNull(newValue :> obj) then
+            ()
+        else            
+            match _valueIds.TryGetValue newValue with
+            | true, ids ->
+                ids.Add(id) |> ignore
+                
+            | _ ->
+                let ids = HashSet<'TId>()
+                ids.Add(id) |> ignore
+                _valueIds[newValue] <- ids
     
     let removeOldValue id oldValue =
-        match _valueIds.TryGetValue oldValue with
-        | true, ids -> ids.Remove(id) |> ignore
-        | _         -> ()
+        if typeof<'TValue>.IsClass && isNull(oldValue :> obj) then
+            ()
+        else
+            match _valueIds.TryGetValue oldValue with
+            | true, ids -> ids.Remove(id) |> ignore
+            | _         -> ()
     
     member this.AddToIndex(id, entity) =
-        let values = getValues entity
-        for v in values do
-            addNewValue id v
+        let values = getValues entity        
+        if not(isNull values) then            
+            for v in values do
+                addNewValue id v
         
     member inline this.AddToIndex(entityId, value) = addNewValue entityId value
     
@@ -43,11 +50,13 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
                 true
         
         if shouldReindex then
-            for v in oldValues do
-                removeOldValue id v
+            if not(isNull oldValues) then
+                for v in oldValues do
+                    removeOldValue id v
                 
-            for v in newValues do
-                addNewValue id v
+            if not(isNull newValues) then                
+                for v in newValues do
+                    addNewValue id v
     
     member this.RemoveFromIndex(id, entity) =
         let values = getValues entity

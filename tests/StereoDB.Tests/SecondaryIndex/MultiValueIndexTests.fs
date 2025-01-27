@@ -113,9 +113,9 @@ let ``MultiValueIndex should support reindexing by hash comparison`` () =
         let orders = ctx.UseTable(ctx.Schema.Orders.Table)
                 
         let categories = [| 2 |] |> Set.ofArray                
-        let order1 = { Id = 1; Categories = categories }
-        let order2 = { Id = 2; Categories = categories }
-        let order3 = { Id = 3; Categories = categories }
+        let order1 = { Id = 1; Categories = categories; Categories2 = Set.empty }
+        let order2 = { Id = 2; Categories = categories; Categories2 = Set.empty }
+        let order3 = { Id = 3; Categories = categories; Categories2 = Set.empty }
       
         orders.Set(order1.Id, order1)
         orders.Set(order2.Id, order2)
@@ -135,4 +135,29 @@ let ``MultiValueIndex should support reindexing by hash comparison`` () =
         
         test <@ category2.Length = 2 @>
         test <@ category5.Length = 1 @>        
-    )              
+    )
+    
+[<Fact>]
+let ``MultiValueIndex should skip null`` () =    
+    let db = StereoDb.create(Schema2(), StereoDbSettings.Default)
+    
+    db.WriteTransaction(fun ctx ->
+        let orders = ctx.UseTable(ctx.Schema.Orders.Table)
+                
+        let categories = [| 2 |] |> Set.ofArray                
+        let order1 = { Id = 1; Categories = categories; Categories2 = Set.empty }
+        let order2 = { Id = 2; Categories = Unchecked.defaultof<_>; Categories2 = [| null |] |> Set.ofArray }        
+      
+        orders.Set(order1)
+        orders.Set(order2)
+        
+        let order2 = { order2 with Categories = categories; Categories2 = [| "str" |] |> Set.ofArray }
+        orders.Set(order2) // reindex
+        
+        let category2A = ctx.Schema.Orders.CategoryIndex.Find(2) |> Seq.toArray
+        let category2B = ctx.Schema.Orders.CategoryIndex2.Find("str") |> Seq.toArray
+        
+        test <@ category2A.Length = 2 @>
+        test <@ category2B.Length = 1 @>
+        test <@ category2B[0].Id = 2 @>
+    )                 

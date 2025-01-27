@@ -11,19 +11,25 @@ type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
     let _valueIds = Dictionary<'TValue, HashSet<'TId>>()    
     
     let addNewValue id newValue =
-        match _valueIds.TryGetValue newValue with
-        | true, ids ->
-            ids.Add(id) |> ignore
-            
-        | _ ->
-            let ids = HashSet<'TId>()
-            ids.Add(id) |> ignore
-            _valueIds[newValue] <- ids
+        if typeof<'TValue>.IsClass && isNull(newValue :> obj) then
+            ()
+        else
+            match _valueIds.TryGetValue newValue with
+            | true, ids ->
+                ids.Add(id) |> ignore
+                
+            | _ ->
+                let ids = HashSet<'TId>()
+                ids.Add(id) |> ignore
+                _valueIds[newValue] <- ids
     
     let removeOldValue id oldValue =
-        match _valueIds.TryGetValue oldValue with
-        | true, ids -> ids.Remove(id) |> ignore
-        | _         -> ()
+        if typeof<'TValue>.IsClass && isNull(oldValue :> obj) then
+            ()
+        else            
+            match _valueIds.TryGetValue oldValue with
+            | true, ids -> ids.Remove(id) |> ignore
+            | _         -> ()
     
     member this.AddToIndex(id, entity) =
         let value = getValue entity

@@ -13,13 +13,19 @@ type internal RangeScanIndex<'TId, 'TEntity, 'TValue when 'TValue : equality and
     
     let addToIndex id entity =
         let value = getValue entity
-        _skipList.Add(value)
-        _valueIndex.AddToIndex(id, value)        
+        if typeof<'TValue>.IsClass && isNull(value :> obj) then
+            ()
+        else            
+            _skipList.Add(value)
+            _valueIndex.AddToIndex(id, value)        
     
     let removeFromIndex id entity =
         let value = getValue entity
-        _skipList.Remove(value) |> ignore
-        _valueIndex.RemoveFromIndex(id, value)        
+        if typeof<'TValue>.IsClass && isNull(value :> obj) then
+            ()
+        else            
+            _skipList.Remove(value) |> ignore
+            _valueIndex.RemoveFromIndex(id, value)        
     
     let tryReIndex id oldEntity newEntity =
         let oldValue = getValue oldEntity

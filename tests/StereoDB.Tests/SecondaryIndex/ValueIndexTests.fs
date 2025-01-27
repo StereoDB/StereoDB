@@ -103,3 +103,23 @@ let ``ValueIndex should handle reindexing`` () =
         test <@ book3.Length = 1 @>
         test <@ book50.Length = 1 @>
     )
+
+[<Fact>]
+let ``ValueIndex should skip null`` () =    
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+    
+    db.WriteTransaction(fun ctx ->
+        let books = ctx.UseTable(ctx.Schema.Books.Table)
+                
+        let book1 = { Id = 1; Title = "1"; Quantity = 1}
+        let book2 = { Id = 2; Title = null; Quantity = 1}        
+      
+        books.Set(book1)
+        books.Set(book2) // add to index
+        
+        let book2 = { book2 with Title = "4" }
+        books.Set(book2) // reindex
+        let foundBook = ctx.Schema.Books.BookTitleIndex.Find(book2.Title) |> Seq.head
+        
+        test <@ foundBook = book2 @>
+    )

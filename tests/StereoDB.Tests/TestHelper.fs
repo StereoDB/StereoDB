@@ -17,7 +17,11 @@ type Order = {
 }
 
 type Schema() =
-    let _books = {| Table = StereoDb.createTable<int, Book>("books") |}
+    let _booksTable = StereoDb.createTable<int, Book>("books")
+    let _books = {|
+        Table = _booksTable
+        BookTitleIndex = _booksTable.AddValueIndex(_.Title)
+    |}
     
     let _ordersTable = StereoDb.createTable<int, Order>("orders")
     let _orders = {|
@@ -36,14 +40,16 @@ type Schema() =
 type Order2 = {
     Id: int    
     Categories: Set<int>
+    Categories2: Set<string>
 }    
     
 type Schema2() =    
     
     let _ordersTable = StereoDb.createTable<int, Order2>("orders")
     let _orders = {|
-        Table = _ordersTable        
+        Table = _ordersTable
         CategoryIndex = _ordersTable.AddMultiValueIndex((fun order -> order.Categories), unsafeReindexByObjRefCompare = true)
+        CategoryIndex2 = _ordersTable.AddMultiValueIndex((fun order -> order.Categories2), unsafeReindexByObjRefCompare = true)
     |}    
     
     member this.Orders = _orders

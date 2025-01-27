@@ -15,7 +15,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="NBomber" Version="5.8.1" />
+      <PackageReference Include="NBomber" Version="5.8.2" />
       <PackageReference Include="NBomber.Data" Version="5.0.0" />
       <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
     </ItemGroup>
