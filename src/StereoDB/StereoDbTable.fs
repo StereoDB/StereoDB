@@ -51,15 +51,6 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         
         {
             new IRangeScanIndex<'TValue, 'TEntity> with
-                member this.Find(value) =
-                    let ids = index.FindIds(value)
-                    seq {
-                        for id in ids do
-                            match _data.TryGetValue id with
-                            | true, v -> v
-                            | _       -> ()
-                    }
-                    
                 member this.SelectRange(fromValue, toValue) =
                     let ids = index.SelectRangeIds(fromValue, toValue)
                     seq {
