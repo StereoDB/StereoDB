@@ -10,7 +10,7 @@ open StereoDB.FSharp
 open Tests.TestHelper
 
 [<Fact>]
-let ``RangeScanIndex SelectRange should work correctly`` () =    
+let ``SelectRange should work correctly`` () =    
     let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     
     db.WriteTransaction(fun ctx ->
@@ -39,6 +39,40 @@ let ``RangeScanIndex SelectRange should work correctly`` () =
         let data = ctx.Schema.Orders.QuantityIndex.SelectRange(1, 10) |> Seq.toArray
         test <@ data.Length = 3 @>
     )
+    
+[<Fact>]
+let ``SelectRangeIds should work correctly`` () =    
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+    
+    db.WriteTransaction(fun ctx ->
+        let orders = ctx.UseTable(ctx.Schema.Orders.Table)
+                
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 5; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 3; Categories = [||] }
+      
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(2, 5) |> Seq.toArray
+        let dataIds = ctx.Schema.Orders.QuantityIndexIds.SelectRangeIds(2, 5) |> Seq.toArray        
+        
+        test <@ data.Length = 2 @>
+        test <@ dataIds.Length = data.Length @>
+        test <@ data[0].Quantity = 3 @>
+        test <@ data[0].Quantity = dataIds[0] @>
+        test <@ data[1].Quantity = 5 @>
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(5, 5) |> Seq.toArray
+        test <@ data.Length = 1 @>
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(6, 7) |> Seq.toArray
+        test <@ data.Length = 0 @>
+        
+        let data = ctx.Schema.Orders.QuantityIndex.SelectRange(1, 10) |> Seq.toArray
+        test <@ data.Length = 3 @>
+    )    
     
 [<Fact>]
 let ``RangeScanIndex remove from index should work correctly`` () =    

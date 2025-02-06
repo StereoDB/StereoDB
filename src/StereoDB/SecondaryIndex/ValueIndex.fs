@@ -51,7 +51,7 @@ type internal ValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
         
     member inline this.RemoveFromIndex(entityId, value) = removeOldValue entityId value
     
-    member this.FindIds(value): 'TId seq  =
+    member inline this.FindIds(value): 'TId seq  =
         match _valueIds.TryGetValue value with
         | true, ids -> ids
         | _         -> Array.Empty<'TId>()

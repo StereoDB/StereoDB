@@ -43,23 +43,7 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
         
         | _ -> ()
         
-        _data.Remove id            
-            
-    let addRangeScanIndex (getValue: Func<'TEntity, 'TValue>) =
-        let index = RangeScanIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)
-        _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
-        
-        {
-            new IRangeScanIndex<'TValue, 'TEntity> with
-                member this.SelectRange(fromValue, toValue) =
-                    let ids = index.SelectRangeIds(fromValue, toValue)
-                    seq {
-                        for id in ids do
-                            match _data.TryGetValue id with
-                            | true, v -> v
-                            | _       -> ()
-                    }
-        }
+        _data.Remove id
         
     let addValueIndex (getValue: Func<'TEntity, 'TValue>) =
         let index = ValueIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)            
@@ -77,6 +61,24 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
                     }
         }
         
+    let addValueIndexIds (getValue: Func<'TEntity, 'TValue>) =
+        let index = ValueIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)            
+        _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+        
+        {
+            new IValueIndexIds<'TValue,'TEntity,'TId> with
+                member this.Find(value) =
+                    let ids = index.FindIds(value)
+                    seq {
+                        for id in ids do
+                            match _data.TryGetValue id with
+                            | true, v -> v
+                            | _       -> ()
+                    }
+                    
+                member this.FindIds(value) = index.FindIds(value)                                    
+        }        
+        
     let addMultiValueIndex (getValues: Func<'TEntity, 'TValue seq>) (unsafeReindexByObjRefCompare) =
         let index = MultiValueIndex<'TId, 'TEntity, 'TValue>(getValues.Invoke, unsafeReindexByObjRefCompare)            
         _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
@@ -92,11 +94,47 @@ type internal StereoDbTable<'TId, 'TEntity when 'TId: equality and 'TEntity: equ
                             | _       -> ()
                     }
         }
+        
+    let addRangeScanIndex (getValue: Func<'TEntity, 'TValue>) =
+        let index = RangeScanIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)
+        _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+        
+        {
+            new IRangeScanIndex<'TValue, 'TEntity> with
+                member this.SelectRange(fromValue, toValue) =
+                    let ids = index.SelectRangeIds(fromValue, toValue)
+                    seq {
+                        for id in ids do
+                            match _data.TryGetValue id with
+                            | true, v -> v
+                            | _       -> ()
+                    }
+        }
+        
+    let addRangeScanIndexIds (getValue: Func<'TEntity, 'TValue>) =
+        let index = RangeScanIndex<'TId, 'TEntity, 'TValue>(getValue.Invoke)
+        _indexes.Add(index :> ISecondaryIndex<'TId, 'TEntity>)
+        
+        {
+            new IRangeScanIndexIds<'TValue,'TEntity,'TId> with
+                member this.SelectRange(fromValue, toValue) =
+                    let ids = index.SelectRangeIds(fromValue, toValue)
+                    seq {
+                        for id in ids do
+                            match _data.TryGetValue id with
+                            | true, v -> v
+                            | _       -> ()
+                    }
+                    
+                member this.SelectRangeIds(fromValue, toValue) = index.SelectRangeIds(fromValue, toValue)                                        
+        }        
     
-    interface IConfigurationTable<'TId, 'TEntity> with        
-        member this.AddRangeScanIndex(getValue) = addRangeScanIndex getValue            
+    interface IConfigurationTable<'TId, 'TEntity> with
         member this.AddValueIndex(getValue) = addValueIndex getValue
-        member this.AddMultiValueIndex(getValue, unsafeReindexByObjRefCompare) = addMultiValueIndex getValue unsafeReindexByObjRefCompare 
+        member this.AddValueIndexIds(getValue) = addValueIndexIds getValue
+        member this.AddMultiValueIndex(getValue, unsafeReindexByObjRefCompare) = addMultiValueIndex getValue unsafeReindexByObjRefCompare
+        member this.AddRangeScanIndex(getValue) = addRangeScanIndex getValue
+        member this.AddRangeScanIndexIds(getValue) = addRangeScanIndexIds getValue
         
     interface ITable with
         member this.TableName = tableName

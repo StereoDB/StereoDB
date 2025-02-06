@@ -34,9 +34,8 @@ type internal RangeScanIndex<'TId, 'TEntity, 'TValue when 'TValue : equality and
         if oldValue <> newValue then  // check if values are different and we should reindex
             removeFromIndex id oldEntity
             addToIndex id newEntity
-    
-    [<MethodImpl(MethodImplOptions.AggressiveInlining)>]
-    member this.FindIds(value) = _valueIndex.FindIds(value)        
+        
+    member inline this.FindIds(value) = _valueIndex.FindIds(value)        
         
     member this.SelectRangeIds(fromValue, toValue) =
         seq {                

@@ -42,6 +42,42 @@ let ``Find should work correctly`` () =
     |> ignore
     
 [<Fact>]
+let ``FindIds should work correctly`` () =    
+    let db = StereoDb.create(Schema(), StereoDbSettings.Default)
+    
+    db.WriteTransaction(fun ctx ->
+        let orders = ctx.UseTable(ctx.Schema.Orders.Table)
+                
+        let order1 = { Id = 1; BookId = 1; Quantity = 1; Categories = [||] }
+        let order2 = { Id = 2; BookId = 1; Quantity = 1; Categories = [||] }
+        let order3 = { Id = 3; BookId = 3; Quantity = 1; Categories = [||] }
+      
+        orders.Set(order1.Id, order1)
+        orders.Set(order2.Id, order2)
+        orders.Set(order3.Id, order3)
+    )
+    
+    db.ReadTransaction(fun ctx ->
+        
+        let book1 = ctx.Schema.Orders.BookIdIndex.Find(1)  |> Seq.toArray
+        let book1Ids = ctx.Schema.Orders.BookIdIndexIds.FindIds(1)  |> Seq.toArray
+        let zeroBooks = ctx.Schema.Orders.BookIdIndex.Find(2) |> Seq.toArray
+        let book3 = ctx.Schema.Orders.BookIdIndex.Find(3)   |> Seq.toArray
+        
+        test <@ book1.Length = 2 @>
+        test <@ book1[0].BookId = book1[1].BookId @>
+        
+        test <@ book1[0].BookId = book1Ids[0] @>
+        test <@ book1.Length = book1Ids.Length @>
+        
+        test <@ zeroBooks.Length = 0 @>
+        test <@ book3.Length = 1 @>
+        
+        ValueNone
+    )
+    |> ignore    
+    
+[<Fact>]
 let ``ValueIndex should handle deletion`` () =    
     let db = StereoDb.create(Schema(), StereoDbSettings.Default)
     

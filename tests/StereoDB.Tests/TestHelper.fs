@@ -27,7 +27,9 @@ type Schema() =
     let _orders = {|
         Table = _ordersTable
         BookIdIndex = _ordersTable.AddValueIndex(fun order -> order.BookId)
+        BookIdIndexIds = _ordersTable.AddValueIndexIds(fun order -> order.BookId)
         QuantityIndex = _ordersTable.AddRangeScanIndex(fun order -> order.Quantity)
+        QuantityIndexIds = _ordersTable.AddRangeScanIndexIds(fun order -> order.Quantity)
         CategoryIndex = _ordersTable.AddMultiValueIndex(fun order -> order.Categories)
     |}
     

@@ -63,7 +63,7 @@ type internal MultiValueIndex<'TId, 'TEntity, 'TValue when 'TValue : equality>
         for v in values do            
             removeOldValue id v
     
-    member this.FindIds(value): 'TId seq  =
+    member inline this.FindIds(value): 'TId seq  =
         match _valueIds.TryGetValue value with
         | true, ids -> ids
         | _         -> Array.Empty<'TId>()
